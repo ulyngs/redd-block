@@ -1,0 +1,14 @@
+{
+    "name": "redd-block-helper",
+    "version": "1.0.0",
+    "description": "Privileged helper daemon for ReDD Block",
+    "main": "redd-block-helper.js",
+    "bin": "redd-block-helper.js",
+    "pkg": {
+        "targets": [
+            "node18-macos-arm64",
+            "node18-macos-x64"
+        ],
+        "outputPath": "dist"
+    }
+}

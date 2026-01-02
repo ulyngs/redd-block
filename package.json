@@ -1,0 +1,40 @@
+{
+  "name": "redd-block",
+  "version": "1.0.0",
+  "description": "ReDD Block - block distracting websites and apps to stay focused",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "dev": "electron . --dev",
+    "build": "node build.js",
+    "build:mac": "node build.js --mac",
+    "build:win": "node build.js --win",
+    "build:linux": "node build.js --linux",
+    "postinstall": "electron-builder install-app-deps"
+  },
+  "keywords": [
+    "blocker",
+    "focus",
+    "productivity",
+    "electron",
+    "website-blocker",
+    "app-blocker"
+  ],
+  "author": {
+    "name": "The Reduce Digital Distraction Project",
+    "email": "team@reddfocus.org"
+  },
+  "license": "CC-BY-NC-ND-3.0",
+  "dependencies": {
+    "electron-log": "^5.4.3",
+    "electron-updater": "^6.6.2",
+    "sudo-prompt": "^9.2.1"
+  },
+  "devDependencies": {
+    "dotenv": "^17.2.3",
+    "electron": "^25.9.8",
+    "electron-builder": "^26.0.12",
+    "pkg": "^5.8.1",
+    "sharp": "^0.34.5"
+  }
+}

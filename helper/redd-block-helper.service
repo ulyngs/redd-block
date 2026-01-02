@@ -1,0 +1,20 @@
+[Unit]
+Description=ReDD Block Helper Daemon
+After=network.target
+
+[Service]
+Type=simple
+ExecStart=/usr/bin/node /usr/local/lib/redd-block/helper/redd-block-helper.js
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=redd-block-helper
+
+# Security hardening
+NoNewPrivileges=false
+ProtectSystem=false
+ProtectHome=false
+
+[Install]
+WantedBy=multi-user.target

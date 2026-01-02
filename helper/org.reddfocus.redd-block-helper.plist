@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>org.reddfocus.redd-block-helper</string>
+    
+    <key>ProgramArguments</key>
+    <array>
+        <string>/usr/local/bin/node</string>
+        <string>/usr/local/lib/redd-block/helper/redd-block-helper.js</string>
+    </array>
+    
+    <!-- Run at system load -->
+    <key>RunAtLoad</key>
+    <true/>
+    
+    <!-- Keep alive - restart if it crashes -->
+    <key>KeepAlive</key>
+    <true/>
+    
+    <!-- Nice level - slightly lower priority than normal -->
+    <key>Nice</key>
+    <integer>5</integer>
+    
+    <!-- Standard output/error logging -->
+    <key>StandardOutPath</key>
+    <string>/var/log/redd-block-helper.log</string>
+    <key>StandardErrorPath</key>
+    <string>/var/log/redd-block-helper.log</string>
+</dict>
+</plist>

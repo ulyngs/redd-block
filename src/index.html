@@ -1,0 +1,436 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ReDD Block</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <div class="app-container">
+        <!-- Title Bar -->
+        <div class="title-bar">
+            <div id="window-controls" class="window-controls hidden">
+                <button id="min-btn" class="win-btn min-btn" title="Minimize">
+                    <svg width="10" height="1" viewBox="0 0 10 1">
+                        <rect width="10" height="1" fill="currentColor"></rect>
+                    </svg>
+                </button>
+                <button id="max-btn" class="win-btn max-btn" title="Maximize">
+                    <svg width="10" height="10" viewBox="0 0 10 10">
+                        <rect width="10" height="10" fill="none" stroke="black" stroke-width="1.2"></rect>
+                    </svg>
+                </button>
+                <button id="close-btn" class="win-btn close-btn" title="Close">
+                    <svg width="10" height="10" viewBox="0 0 10 10">
+                        <path d="M0,0 L10,10 M10,0 L0,10" stroke="currentColor" stroke-width="1.2"></path>
+                    </svg>
+                </button>
+            </div>
+        </div>
+
+        <!-- Main Content - Grid Layout -->
+        <div id="main-content" class="main-content">
+            <!-- Top Row: Scheduler + Blocklists -->
+            <div class="grid-top-row">
+                <!-- Block Scheduler (Left Column) -->
+                <div id="scheduler-section" class="scheduler-section">
+                    <div class="section-header">
+                        <h2>Start a Block</h2>
+                    </div>
+
+                    <div class="scheduler-content">
+                        <!-- Blocklist Selector -->
+                        <div class="blocklist-selector">
+                            <select id="blocklist-select" class="blocklist-dropdown">
+                                <option value="">Select a blocklist...</option>
+                            </select>
+                        </div>
+
+                        <!-- Time Pickers (hidden until blocklist selected) -->
+                        <div class="time-picker-container hidden" id="time-picker-container">
+                            <!-- Duration & End Row -->
+                            <div class="time-pickers-row">
+                                <div class="time-picker-group">
+                                    <label class="time-label">Duration</label>
+                                    <div class="duration-input-wrapper">
+                                        <input type="number" id="duration-minutes-input" class="duration-input" min="1"
+                                            max="1440" value="60">
+                                        <span class="duration-unit">min</span>
+                                    </div>
+                                </div>
+                                <span class="time-separator">→</span>
+                                <div class="time-picker-group">
+                                    <label class="time-label">End</label>
+                                    <div class="time-picker-row">
+                                        <div class="time-display" id="end-time-display">
+                                            <div class="time-part-wrapper">
+                                                <button class="time-part" id="end-hour-btn" data-type="hour"
+                                                    data-target="end">20</button>
+                                                <!-- Hour Popover -->
+                                                <div class="time-popover hidden" id="end-hour-popover">
+                                                    <div class="popover-scroll" id="end-hour-options"></div>
+                                                </div>
+                                            </div>
+                                            <span class="time-colon">:</span>
+                                            <div class="time-part-wrapper">
+                                                <button class="time-part" id="end-minute-btn" data-type="minute"
+                                                    data-target="end">30</button>
+                                                <!-- Minute Popover -->
+                                                <div class="time-popover hidden" id="end-minute-popover">
+                                                    <div class="popover-scroll" id="end-minute-options"></div>
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <span id="next-day-indicator" class="next-day-badge hidden">+1 day</span>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Quick Select Row -->
+                            <div class="quick-select-row">
+                                <label class="time-label">Quick Select</label>
+                                <div class="duration-quick-btns">
+                                    <button type="button" class="duration-quick-btn" data-mins="15">15</button>
+                                    <button type="button" class="duration-quick-btn" data-mins="30">30</button>
+                                    <button type="button" class="duration-quick-btn" data-mins="45">45</button>
+                                    <button type="button" class="duration-quick-btn active" data-mins="60">60</button>
+                                </div>
+                            </div>
+                        </div>
+                        <!-- Start Block Button -->
+                        <button id="start-block-btn" class="start-block-btn" disabled>
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                                <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                            </svg>
+                            Start Block
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Blocklists Section (Right Column) -->
+                <div id="blocklists-section" class="blocklists-section">
+                    <div class="section-header">
+                        <h2>Your Blocklists</h2>
+                        <button id="add-blocklist-btn" class="icon-btn" title="Add blocklist">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <line x1="12" y1="5" x2="12" y2="19"></line>
+                                <line x1="5" y1="12" x2="19" y2="12"></line>
+                            </svg>
+                        </button>
+                    </div>
+                    <div id="blocklists-container" class="blocklists-container">
+                        <!-- Blocklists will be rendered here -->
+                    </div>
+                </div>
+            </div>
+
+            <!-- Bottom Row: Timeline (spans full width) -->
+            <div class="timeline-section">
+                <div class="section-header">
+                    <h2>Timeline</h2>
+                </div>
+
+                <!-- Timeline container -->
+                <div class="timeline-container">
+                    <div class="timeline-content-wrapper">
+                        <!-- Time axis (markers generated by JS) -->
+                        <div class="timeline-axis" id="timeline-axis"></div>
+
+                        <!-- Timeline track -->
+                        <div class="timeline-track" id="timeline-track">
+                            <!-- Now indicator line -->
+                            <div class="now-indicator" id="now-indicator"></div>
+
+                            <!-- Preview block (shown when configuring) -->
+                            <div id="preview-timeline-block" class="timeline-block preview hidden">
+                                <span class="block-label">Select a blocklist</span>
+                            </div>
+
+                            <!-- Active blocks will be rendered here by JS -->
+                        </div>
+                    </div>
+
+                    <!-- No blocks message -->
+                    <div id="no-blocks-message" class="no-blocks-message">
+                        <p>No active blocks</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Onboarding Screen -->
+        <div id="onboarding-screen" class="onboarding-screen hidden">
+            <div class="onboarding-content">
+                <div class="onboarding-icon">
+                    <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"
+                        stroke-linecap="round" stroke-linejoin="round">
+                        <rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect>
+                        <path d="M7 11V7a5 5 0 0 1 10 0v4"></path>
+                    </svg>
+                </div>
+                <h1>Welcome to ReDD Block</h1>
+                <p>Block distracting websites and apps to stay focused on what matters.</p>
+                <p class="subtle">Let's create your first blocklist.</p>
+
+                <div class="onboarding-form">
+                    <div class="form-group">
+                        <label for="first-blocklist-name">Blocklist Name</label>
+                        <input type="text" id="first-blocklist-name" placeholder="e.g., Social Media"
+                            class="form-input">
+                    </div>
+
+                    <div class="form-group">
+                        <label class="label-with-info">
+                            Websites to block
+                            <span class="info-tooltip-wrapper">
+                                <svg class="info-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                    stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                                    stroke-linejoin="round">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="16" x2="12" y2="12"></line>
+                                    <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                                </svg>
+                                <span class="info-tooltip">Blocking applies to entire domains. For example, typing
+                                    "facebook.com" blocks all of Facebook, not just specific pages.</span>
+                            </span>
+                        </label>
+                        <div class="tags-input-container">
+                            <div id="websites-tags" class="tags-container"></div>
+                            <input type="text" id="website-input" placeholder="e.g., facebook.com" class="form-input">
+                        </div>
+                        <span class="form-hint">Press Enter to add each website</span>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Apps to block (optional)</label>
+                        <div class="tags-input-container">
+                            <div id="apps-tags" class="tags-container"></div>
+                            <div class="input-with-button">
+                                <input type="text" id="app-input" placeholder="e.g., Safari" class="form-input">
+                                <button type="button" id="browse-apps-btn" class="browse-btn"
+                                    title="Browse Applications">
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                        stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                        <path
+                                            d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                        </path>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <span class="form-hint">Press Enter to add each app, or click the folder icon to browse</span>
+                    </div>
+
+                    <button id="create-first-blocklist-btn" class="primary-btn">
+                        Create Blocklist
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Blocklist Modal -->
+        <div id="blocklist-modal" class="modal-overlay hidden">
+            <div class="modal-content">
+                <h3 id="modal-title">Create Blocklist</h3>
+
+                <div id="active-blocklist-warning" class="warning-banner hidden">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <circle cx="12" cy="12" r="10"></circle>
+                        <line x1="12" y1="8" x2="12" y2="12"></line>
+                        <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                    </svg>
+                    <span>This blocklist is active. Some settings are locked.</span>
+                </div>
+
+                <div class="form-group">
+                    <label for="blocklist-name">Name</label>
+                    <input type="text" id="blocklist-name" placeholder="e.g., Social Media" class="form-input">
+                </div>
+
+                <div class="form-group">
+                    <label>Mode</label>
+                    <div class="mode-toggle">
+                        <button id="mode-blocklist" class="mode-btn active">Block these</button>
+                        <button id="mode-allowlist" class="mode-btn">Allow only these</button>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label class="label-with-info">
+                        Websites
+                        <span class="info-tooltip-wrapper">
+                            <svg class="info-icon" width="14" height="14" viewBox="0 0 24 24" fill="none"
+                                stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="16" x2="12" y2="12"></line>
+                                <line x1="12" y1="8" x2="12.01" y2="8"></line>
+                            </svg>
+                            <span class="info-tooltip">Blocking applies to entire domains. For example, typing
+                                "facebook.com" blocks all of Facebook, not just specific pages.</span>
+                        </span>
+                    </label>
+                    <div class="tags-input-container">
+                        <div id="modal-websites-tags" class="tags-container"></div>
+                        <input type="text" id="modal-website-input" placeholder="e.g., facebook.com" class="form-input">
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Apps</label>
+                    <div class="tags-input-container">
+                        <div id="modal-apps-tags" class="tags-container"></div>
+                        <div class="input-with-button">
+                            <input type="text" id="modal-app-input" placeholder="e.g., Safari" class="form-input">
+                            <button type="button" id="modal-browse-apps-btn" class="browse-btn"
+                                title="Browse Applications">
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                                    stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                                    <path
+                                        d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z">
+                                    </path>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Override Difficulty</label>
+                    <select id="override-type" class="form-select">
+                        <option value="random-words">Random Words</option>
+                        <option value="gibberish">Random Characters</option>
+                        <option value="custom">Custom Text</option>
+                    </select>
+                    <input type="number" id="override-count" class="form-input small" value="10" min="5" max="100">
+                    <span class="form-hint">Number of words/characters to type to override</span>
+                    <textarea id="custom-override-text" class="form-textarea hidden"
+                        placeholder="Enter your custom text (e.g., a motivational statement)"></textarea>
+                </div>
+
+                <div class="form-group">
+                    <label>Color</label>
+                    <div class="color-picker-container">
+                        <div class="color-swatches" id="color-swatches">
+                            <!-- Fun yet calming pastel palette -->
+                            <button type="button" class="color-swatch selected" data-color="#FF9E9E"
+                                style="background: #FF9E9E" title="Sunset"></button>
+                            <button type="button" class="color-swatch" data-color="#FFC09F" style="background: #FFC09F"
+                                title="Apricot"></button>
+                            <button type="button" class="color-swatch" data-color="#FFEE93" style="background: #FFEE93"
+                                title="Buttercup"></button>
+                            <button type="button" class="color-swatch" data-color="#ADF7B6" style="background: #ADF7B6"
+                                title="Mint"></button>
+                            <button type="button" class="color-swatch" data-color="#A0CED9" style="background: #A0CED9"
+                                title="Ice"></button>
+                            <button type="button" class="color-swatch" data-color="#81B1D1" style="background: #81B1D1"
+                                title="Sky"></button>
+                            <button type="button" class="color-swatch" data-color="#B19CD9" style="background: #B19CD9"
+                                title="Lavender"></button>
+                            <button type="button" class="color-swatch" data-color="#FFD1DC" style="background: #FFD1DC"
+                                title="Blush"></button>
+                            <!-- Custom color picker -->
+                            <div class="custom-color-wrapper">
+                                <input type="color" id="custom-color-input" class="custom-color-input" value="#667eea">
+                                <button type="button" class="color-swatch custom-swatch" id="custom-color-swatch"
+                                    data-color="custom" style="background: #667eea">
+                                    <span class="custom-icon">+</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="form-group">
+                    <label>Emoji</label>
+                    <div class="emoji-picker-container">
+                        <div class="emoji-swatches" id="emoji-swatches">
+                            <button type="button" class="emoji-swatch selected" data-emoji="🚫">🚫</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🔒">🔒</button>
+                            <button type="button" class="emoji-swatch" data-emoji="⛔">⛔</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🛑">🛑</button>
+                            <button type="button" class="emoji-swatch" data-emoji="📵">📵</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🧘">🧘</button>
+                            <button type="button" class="emoji-swatch" data-emoji="💪">💪</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🎯">🎯</button>
+                            <button type="button" class="emoji-swatch" data-emoji="📚">📚</button>
+                            <button type="button" class="emoji-swatch" data-emoji="💼">💼</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🏃">🏃</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🧠">🧠</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🌊">🌊</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🌳">🌳</button>
+                            <button type="button" class="emoji-swatch" data-emoji="🍵">🍵</button>
+                            <!-- Custom emoji selector -->
+                            <div class="custom-emoji-wrapper">
+                                <input type="text" id="custom-emoji-input" class="custom-emoji-input" maxlength="2"
+                                    placeholder="?">
+                                <button type="button" class="emoji-swatch custom-emoji-swatch" id="custom-emoji-swatch">
+                                    <span class="custom-icon">+</span>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="modal-buttons">
+                    <button id="cancel-blocklist-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button id="save-blocklist-btn" class="modal-btn primary-btn">Save</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Override Challenge Modal -->
+        <div id="override-modal" class="modal-overlay hidden">
+            <div class="modal-content override-challenge">
+                <h3 id="override-modal-title">Override Block?</h3>
+                <div id="override-summary" class="override-summary"></div>
+                <p>To cancel this block early, type the following:</p>
+                <div id="challenge-text" class="challenge-text"></div>
+                <textarea id="challenge-input" class="challenge-input" placeholder="Type here..."></textarea>
+                <div class="challenge-progress">
+                    <div id="challenge-progress-bar" class="challenge-progress-bar"></div>
+                </div>
+                <div class="modal-buttons">
+                    <button id="cancel-override-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button id="confirm-override-btn" class="modal-btn black-btn">Override</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Helper Install Modal -->
+        <div id="helper-install-modal" class="modal-overlay hidden">
+            <div class="modal-content helper-install-modal">
+                <h3>Setup Required</h3>
+                <p>To block websites when the app is closed, ReDD Block needs to install a small background service.
+                    Your computer will prompt you for your
+                    password once — after that, blocks will start instantly without asking again.</p>
+                <p class="modal-note">You can see the <a href="https://github.com/ulyngs/redd-block"
+                        target="_blank">open source code for ReDD Block here</a>.</p>
+                <div class="modal-buttons">
+                    <button id="cancel-helper-install-btn" class="modal-btn cancel-btn">Cancel</button>
+                    <button id="proceed-helper-install-btn" class="modal-btn primary-btn">Proceed</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Undo Toast -->
+        <div id="undo-toast" class="undo-toast hidden">
+            <span id="undo-toast-message">Deleted blocklist</span>
+            <button id="undo-toast-btn" class="undo-btn">Undo</button>
+        </div>
+
+        <!-- Footer -->
+        <div class="footer">
+            Made with <span class="heart">♥</span> by <a href="https://reddfocus.org" target="_blank">reddfocus.org</a>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+
+</html>

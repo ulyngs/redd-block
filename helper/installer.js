@@ -43,8 +43,17 @@ function isHelperInstalled() {
     } else if (process.platform === 'linux') {
         return fs.existsSync(SYSTEMD_PATH) && fs.existsSync(path.join(INSTALL_PATH, 'redd-block-helper.js'));
     } else if (process.platform === 'win32') {
-        // Check if helper file exists (works for both Service and Scheduled Task/Dev mode)
-        return fs.existsSync(path.join(INSTALL_PATH, 'redd-block-helper.js'));
+        // Dev mode: Check if helper js file exists
+        if (fs.existsSync(path.join(INSTALL_PATH, 'redd-block-helper.js'))) {
+            return true;
+        }
+        // Production mode: Check if Windows Service exists
+        try {
+            execSync('sc query "ReddBlockHelper"', { stdio: 'ignore' });
+            return true;
+        } catch {
+            return false;
+        }
     }
     return false;
 }

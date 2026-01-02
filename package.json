@@ -10,7 +10,8 @@
     "build:mac": "node build.js --mac",
     "build:win": "node build.js --win",
     "build:linux": "node build.js --linux",
-    "postinstall": "electron-builder install-app-deps"
+    "postinstall": "electron-builder install-app-deps",
+    "compile:helper": "pkg helper/redd-block-helper.js -t node18-win-x64 -o helper/dist/redd-block-helper-win.exe"
   },
   "keywords": [
     "blocker",

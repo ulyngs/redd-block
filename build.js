@@ -75,9 +75,20 @@ builder.build({
         {
           target: 'zip',
           arch: ['x64']
+        },
+        {
+          target: 'appx',
+          arch: ['x64']
         }
       ],
-      icon: 'assets/icon.ico'
+      icon: 'assets/icon.ico',
+      appx: {
+        applicationId: 'ReDDBlock',
+        displayName: 'ReDD Block',
+        identityName: 'ReDDBlock',
+        publisher: 'CN=ReddFocus',
+        publisherDisplayName: 'Reduce Digital Distraction Project'
+      }
     },
     linux: {
       target: [

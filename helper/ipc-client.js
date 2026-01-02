@@ -9,7 +9,7 @@ const net = require('net');
 const path = require('path');
 
 const SOCKET_PATH = process.platform === 'win32'
-    ? '\\\\.\\pipe\\redd-block-helper'
+    ? 62222  // Use TCP port on Windows to match helper
     : '/tmp/redd-block-helper.sock';
 
 const CONNECTION_TIMEOUT = 5000;
@@ -108,7 +108,11 @@ class HelperClient {
                 }
             });
 
-            socket.connect(SOCKET_PATH);
+            if (process.platform === 'win32' && typeof SOCKET_PATH === 'number') {
+                socket.connect(SOCKET_PATH, '127.0.0.1');
+            } else {
+                socket.connect(SOCKET_PATH);
+            }
         });
     }
 

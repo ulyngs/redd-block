@@ -21,7 +21,7 @@ const os = require('os');
 
 // Configuration
 const SOCKET_PATH = process.platform === 'win32'
-    ? '\\\\.\\pipe\\redd-block-helper'
+    ? 62222  // Use TCP port on Windows to avoid Named Pipe permission issues between Admin/User
     : '/tmp/redd-block-helper.sock';
 
 const DATA_PATH = process.platform === 'win32'
@@ -454,7 +454,11 @@ function startServer() {
         process.exit(1);
     });
 
-    server.listen(SOCKET_PATH, () => {
+    const listenArgs = typeof SOCKET_PATH === 'number'
+        ? [SOCKET_PATH, '127.0.0.1']
+        : [SOCKET_PATH];
+
+    server.listen(...listenArgs, () => {
         log(`Helper daemon listening on ${SOCKET_PATH}`);
 
         // Set socket permissions (readable by all, but we'll add security later)

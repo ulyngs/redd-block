@@ -209,52 +209,75 @@ function installWindows() {
         // Create data directory
         const dataDir = path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'ReDD Block');
 
-        // Build PowerShell install script
-        // This runs as Administrator via sudo-prompt
-        const installScript = hasWindowsBinary ? `
-            # Create install directory
-            New-Item -ItemType Directory -Force -Path "${INSTALL_PATH.replace(/\\/g, '\\\\')}"
-            New-Item -ItemType Directory -Force -Path "${dataDir.replace(/\\/g, '\\\\')}"
-            
-            # Copy helper binary
-            Copy-Item "${helperBinary.replace(/\\/g, '\\\\')}" "${path.join(INSTALL_PATH, 'redd-block-helper.exe').replace(/\\/g, '\\\\')}" -Force
-            
-            # Create Windows Service using sc.exe
-            sc.exe create "ReddBlockHelper" binpath= "${path.join(INSTALL_PATH, 'redd-block-helper.exe').replace(/\\/g, '\\\\')}" start= auto displayname= "ReDD Block Helper"
-            sc.exe description "ReddBlockHelper" "Background service for ReDD Block website blocker"
-            sc.exe start "ReddBlockHelper"
-            
-            Write-Host "Helper installed successfully"
-        ` : `
-            # Create install directory
-            New-Item -ItemType Directory -Force -Path "${INSTALL_PATH.replace(/\\/g, '\\\\')}"
-            New-Item -ItemType Directory -Force -Path "${dataDir.replace(/\\/g, '\\\\')}"
-            
-            # Copy helper script files
-            Copy-Item "${path.join(sourcePath, 'redd-block-helper.js').replace(/\\/g, '\\\\')}" "${INSTALL_PATH.replace(/\\/g, '\\\\')}\\\\" -Force
-            Copy-Item "${path.join(sourcePath, 'ipc-client.js').replace(/\\/g, '\\\\')}" "${INSTALL_PATH.replace(/\\/g, '\\\\')}\\\\" -Force
-            
-            # Create a scheduled task that runs at startup as SYSTEM
-            # This is a fallback when we don't have a compiled binary
-            $action = New-ScheduledTaskAction -Execute "node" -Argument "${path.join(INSTALL_PATH, 'redd-block-helper.js').replace(/\\/g, '\\\\')}"
-            $trigger = New-ScheduledTaskTrigger -AtStartup
-            $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
-            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
-            
-            # Unregister existing task if present
-            Unregister-ScheduledTask -TaskName "ReddBlockHelper" -Confirm:$false -ErrorAction SilentlyContinue
-            
-            # Register and start the task
-            Register-ScheduledTask -TaskName "ReddBlockHelper" -Action $action -Trigger $trigger -Principal $principal -Settings $settings
-            Start-ScheduledTask -TaskName "ReddBlockHelper"
-            
-            Write-Host "Helper installed successfully (using scheduled task)"
-        `;
+        // Get the full path to node.exe - we're already running in Node so use process.execPath
+        // This ensures SYSTEM user can find node even if it's not in system PATH
+        const nodePath = process.execPath;
 
-        // Execute the PowerShell script with admin privileges
-        sudo.exec(`powershell -ExecutionPolicy Bypass -Command "${installScript.replace(/"/g, '\\"')}"`,
+        // Build the script path for the helper
+        const helperScriptPath = path.join(INSTALL_PATH, 'redd-block-helper.js');
+
+        // Build PowerShell install script
+        // For the scheduled task version, we need to be careful with escaping
+        let installScript;
+
+        if (hasWindowsBinary) {
+            installScript = `
+# Create install directory
+New-Item -ItemType Directory -Force -Path "${INSTALL_PATH}"
+New-Item -ItemType Directory -Force -Path "${dataDir}"
+
+# Copy helper binary
+Copy-Item "${helperBinary}" "${path.join(INSTALL_PATH, 'redd-block-helper.exe')}" -Force
+
+# Create Windows Service using sc.exe
+sc.exe create "ReddBlockHelper" binpath= "${path.join(INSTALL_PATH, 'redd-block-helper.exe')}" start= auto displayname= "ReDD Block Helper"
+sc.exe description "ReddBlockHelper" "Background service for ReDD Block website blocker"
+sc.exe start "ReddBlockHelper"
+
+Write-Host "Helper installed successfully"
+`;
+        } else {
+            // Development mode: run helper directly without scheduled task
+            // This avoids SYSTEM user permission issues with named pipes
+
+            // Build the script using string concatenation
+            // Use single quotes in PowerShell for paths with spaces
+            const scriptLines = [
+                '# Create install directory',
+                "New-Item -ItemType Directory -Force -Path '" + INSTALL_PATH + "'",
+                "New-Item -ItemType Directory -Force -Path '" + dataDir + "'",
+                '',
+                '# Copy helper script files',
+                "Copy-Item '" + path.join(sourcePath, 'redd-block-helper.js') + "' '" + INSTALL_PATH + "\\' -Force",
+                "Copy-Item '" + path.join(sourcePath, 'ipc-client.js') + "' '" + INSTALL_PATH + "\\' -Force",
+                '',
+                '# Start the helper process directly (development mode)',
+                "Start-Process -FilePath '" + nodePath + "' -ArgumentList '\"" + helperScriptPath + "\"' -WorkingDirectory '" + INSTALL_PATH + "' -WindowStyle Hidden",
+                '',
+                '# Wait for the helper to start and create the pipe',
+                'Start-Sleep -Seconds 2',
+                '',
+                'Write-Host "Helper installed and started (development mode)"'
+            ];
+            installScript = scriptLines.join('\r\n');
+        }
+
+        // Write the PowerShell script to a temp file to avoid escaping issues
+        const tempScriptPath = path.join(process.env.TEMP || 'C:\\Windows\\Temp', 'redd-block-install.ps1');
+        fs.writeFileSync(tempScriptPath, installScript, 'utf8');
+
+        // Execute the PowerShell script file with admin privileges
+        // Using -File instead of -Command avoids escaping issues
+        sudo.exec('powershell.exe -ExecutionPolicy Bypass -File "' + tempScriptPath + '"',
             { name: 'ReDD Block Website Blocker' },
             (error, stdout, stderr) => {
+                // Clean up temp script
+                try {
+                    fs.unlinkSync(tempScriptPath);
+                } catch (e) {
+                    // Ignore cleanup errors
+                }
+
                 if (error) {
                     if (error.message && error.message.includes('User did not grant permission')) {
                         reject(new Error('Permission denied'));
@@ -283,7 +306,7 @@ async function installHelper() {
     } else if (process.platform === 'win32') {
         return installWindows();
     } else {
-        throw new Error(`Unsupported platform: ${process.platform}`);
+        throw new Error(`Unsupported platform: ${process.platform} `);
     }
 }
 
@@ -296,24 +319,24 @@ async function uninstallHelper() {
 
         if (process.platform === 'darwin') {
             uninstallScript = `
-                launchctl unload "${PLIST_PATH}" 2>/dev/null || true
-                rm -f "${PLIST_PATH}"
-                rm -rf "${INSTALL_PATH}"
-                rm -rf /var/lib/redd-block
+                launchctl unload "${PLIST_PATH}" 2 > /dev/null || true
+        rm - f "${PLIST_PATH}"
+        rm - rf "${INSTALL_PATH}"
+        rm - rf /var/lib/redd - block
                 echo "Helper uninstalled"
             `;
         } else if (process.platform === 'linux') {
             uninstallScript = `
-                systemctl stop redd-block-helper 2>/dev/null || true
-                systemctl disable redd-block-helper 2>/dev/null || true
-                rm -f "${SYSTEMD_PATH}"
-                rm -rf "${INSTALL_PATH}"
-                rm -rf /var/lib/redd-block
-                systemctl daemon-reload
+                systemctl stop redd - block - helper 2 > /dev/null || true
+                systemctl disable redd - block - helper 2 > /dev/null || true
+        rm - f "${SYSTEMD_PATH}"
+        rm - rf "${INSTALL_PATH}"
+        rm - rf /var/lib/redd - block
+                systemctl daemon - reload
                 echo "Helper uninstalled"
             `;
         } else {
-            return reject(new Error(`Unsupported platform: ${process.platform}`));
+            return reject(new Error(`Unsupported platform: ${process.platform} `));
         }
 
         sudo.exec(uninstallScript, { name: 'ReDD Block' }, (error, stdout, stderr) => {

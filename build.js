@@ -81,14 +81,14 @@ builder.build({
           arch: ['x64']
         }
       ],
-      icon: 'assets/icon.ico',
-      appx: {
-        applicationId: 'ReDDBlock',
-        displayName: 'ReDD Block',
-        identityName: 'ReDDBlock',
-        publisher: 'CN=ReddFocus',
-        publisherDisplayName: 'Reduce Digital Distraction Project'
-      }
+      icon: 'assets/icon.ico'
+    },
+    appx: {
+      applicationId: 'ReDDBlock',
+      displayName: 'ReDD Block',
+      identityName: 'ReDDBlock',
+      publisher: 'CN=ReddFocus',
+      publisherDisplayName: 'Reduce Digital Distraction Project'
     },
     linux: {
       target: [

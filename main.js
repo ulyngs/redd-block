@@ -770,31 +770,44 @@ function startBlockingInterval() {
                         }
                     });
                 } else if (process.platform === 'win32') {
-                    // Windows: Use PowerShell to minimize windows
+                    // Windows: Minimize the application using a temp script to avoid escaping issues
+                    const tempScriptPath = path.join(app.getPath('temp'), `minimize-apps-${Date.now()}.ps1`);
                     const appsArray = Array.from(blockedApps).map(a => `"${a}"`).join(',');
+
                     const psScript = `
-                        $blockedApps = @(${appsArray})
-                        $shell = New-Object -ComObject Shell.Application
-                        Get-Process | Where-Object { $blockedApps -contains $_.ProcessName } | ForEach-Object {
-                            try {
-                                $shell.MinimizeAll()
-                                $_.MainWindowHandle | ForEach-Object {
-                                    Add-Type -TypeDefinition @"
-                                        using System;
-                                        using System.Runtime.InteropServices;
-                                        public class Win32 {
-                                            [DllImport("user32.dll")]
-                                            public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-                                        }
+$blockedApps = @(${appsArray})
+
+$code = @"
+using System;
+using System.Runtime.InteropServices;
+public class Win32 {
+    [DllImport("user32.dll")]
+    public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
 "@
-                                    [Win32]::ShowWindow($_, 6) # SW_MINIMIZE = 6
-                                }
-                            } catch {}
-                        }
-                    `;
-                    exec(`powershell -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
-                        if (err) log.error('Error minimizing Windows apps:', err);
-                    });
+
+if (-not ([System.Management.Automation.PSTypeName]'Win32').Type) {
+    Add-Type -TypeDefinition $code -Language CSharp
+}
+
+Get-Process | Where-Object { $blockedApps -contains $_.ProcessName } | ForEach-Object {
+    if ($_.MainWindowHandle -ne [IntPtr]::Zero) {
+        [Win32]::ShowWindow($_.MainWindowHandle, 6) # SW_MINIMIZE = 6
+    }
+}
+`;
+                    try {
+                        fs.writeFileSync(tempScriptPath, psScript);
+                        exec(`powershell -ExecutionPolicy Bypass -File "${tempScriptPath}"`, (err, stdout, stderr) => {
+                            // Clean up temp file
+                            try { fs.unlinkSync(tempScriptPath); } catch (e) { }
+
+                            if (err) log.error('Error minimizing Windows apps:', err);
+                            if (stderr) log.warn('PowerShell stderr:', stderr);
+                        });
+                    } catch (e) {
+                        log.error('Failed to write minimization script:', e);
+                    }
                 }
             }
         }

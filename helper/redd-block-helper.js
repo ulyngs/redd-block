@@ -156,10 +156,17 @@ function addBlockToHosts(content, domains) {
     return content.trimEnd() + '\n' + blockLines.join('\n');
 }
 
-// Firewall management (macOS pf)
+// Firewall management
 function applyFirewallRules(domains) {
-    if (process.platform !== 'darwin') return true;
+    if (process.platform === 'darwin') {
+        return applyFirewallRulesMacOS(domains);
+    } else if (process.platform === 'win32') {
+        return applyFirewallRulesWindows(domains);
+    }
+    return true; // Linux uses hosts file only for now
+}
 
+function applyFirewallRulesMacOS(domains) {
     try {
         // Create pf anchor file
         const anchorPath = '/etc/pf.anchors/com.redd.block';
@@ -176,14 +183,43 @@ function applyFirewallRules(domains) {
 
         return true;
     } catch (err) {
-        logError('Failed to apply firewall rules', err);
+        logError('Failed to apply macOS firewall rules', err);
+        return false;
+    }
+}
+
+function applyFirewallRulesWindows(domains) {
+    try {
+        // Remove any existing ReDD Block firewall rules first
+        try {
+            execSync('netsh advfirewall firewall delete rule name="ReDD Block"', { stdio: 'ignore' });
+        } catch (e) {
+            // Rule might not exist, that's fine
+        }
+
+        // Add outbound block rules for each domain
+        // Windows Firewall doesn't block by domain name, so we resolve to IPs
+        // For now, we'll rely primarily on hosts file and add this as a placeholder
+        // for future IP-based blocking
+
+        log('Windows firewall rules: relying on hosts file blocking');
+        return true;
+    } catch (err) {
+        logError('Failed to apply Windows firewall rules', err);
         return false;
     }
 }
 
 function clearFirewallRules() {
-    if (process.platform !== 'darwin') return true;
+    if (process.platform === 'darwin') {
+        return clearFirewallRulesMacOS();
+    } else if (process.platform === 'win32') {
+        return clearFirewallRulesWindows();
+    }
+    return true;
+}
 
+function clearFirewallRulesMacOS() {
     try {
         execSync('pfctl -a com.redd.block -F all 2>/dev/null || true');
 
@@ -195,8 +231,18 @@ function clearFirewallRules() {
 
         return true;
     } catch (err) {
-        logError('Failed to clear firewall rules', err);
+        logError('Failed to clear macOS firewall rules', err);
         return false;
+    }
+}
+
+function clearFirewallRulesWindows() {
+    try {
+        execSync('netsh advfirewall firewall delete rule name="ReDD Block"', { stdio: 'ignore' });
+        return true;
+    } catch (err) {
+        // Rule might not exist, which is fine
+        return true;
     }
 }
 

@@ -193,12 +193,81 @@ function installLinux() {
 
 /**
  * Install the helper on Windows
+ * Uses a Windows Service created via nssm (Non-Sucking Service Manager)
+ * or alternatively a Scheduled Task running at SYSTEM level
  */
 function installWindows() {
     return new Promise((resolve, reject) => {
-        // For Windows, we'll use a simpler approach with a scheduled task
-        // or the node-windows package in a future update
-        reject(new Error('Windows helper installation not yet implemented'));
+        const sourcePath = getSourceHelperPath();
+
+        // Use the compiled binary for Windows
+        const helperBinary = path.join(sourcePath, 'dist', 'redd-block-helper-win.exe');
+
+        // For development, check if we have a Windows binary, otherwise use node
+        const hasWindowsBinary = fs.existsSync(helperBinary);
+
+        // Create data directory
+        const dataDir = path.join(process.env.PROGRAMDATA || 'C:\\ProgramData', 'ReDD Block');
+
+        // Build PowerShell install script
+        // This runs as Administrator via sudo-prompt
+        const installScript = hasWindowsBinary ? `
+            # Create install directory
+            New-Item -ItemType Directory -Force -Path "${INSTALL_PATH.replace(/\\/g, '\\\\')}"
+            New-Item -ItemType Directory -Force -Path "${dataDir.replace(/\\/g, '\\\\')}"
+            
+            # Copy helper binary
+            Copy-Item "${helperBinary.replace(/\\/g, '\\\\')}" "${path.join(INSTALL_PATH, 'redd-block-helper.exe').replace(/\\/g, '\\\\')}" -Force
+            
+            # Create Windows Service using sc.exe
+            sc.exe create "ReddBlockHelper" binpath= "${path.join(INSTALL_PATH, 'redd-block-helper.exe').replace(/\\/g, '\\\\')}" start= auto displayname= "ReDD Block Helper"
+            sc.exe description "ReddBlockHelper" "Background service for ReDD Block website blocker"
+            sc.exe start "ReddBlockHelper"
+            
+            Write-Host "Helper installed successfully"
+        ` : `
+            # Create install directory
+            New-Item -ItemType Directory -Force -Path "${INSTALL_PATH.replace(/\\/g, '\\\\')}"
+            New-Item -ItemType Directory -Force -Path "${dataDir.replace(/\\/g, '\\\\')}"
+            
+            # Copy helper script files
+            Copy-Item "${path.join(sourcePath, 'redd-block-helper.js').replace(/\\/g, '\\\\')}" "${INSTALL_PATH.replace(/\\/g, '\\\\')}\\\\" -Force
+            Copy-Item "${path.join(sourcePath, 'ipc-client.js').replace(/\\/g, '\\\\')}" "${INSTALL_PATH.replace(/\\/g, '\\\\')}\\\\" -Force
+            
+            # Create a scheduled task that runs at startup as SYSTEM
+            # This is a fallback when we don't have a compiled binary
+            $action = New-ScheduledTaskAction -Execute "node" -Argument "${path.join(INSTALL_PATH, 'redd-block-helper.js').replace(/\\/g, '\\\\')}"
+            $trigger = New-ScheduledTaskTrigger -AtStartup
+            $principal = New-ScheduledTaskPrincipal -UserId "SYSTEM" -LogonType ServiceAccount -RunLevel Highest
+            $settings = New-ScheduledTaskSettingsSet -AllowStartIfOnBatteries -DontStopIfGoingOnBatteries -StartWhenAvailable
+            
+            # Unregister existing task if present
+            Unregister-ScheduledTask -TaskName "ReddBlockHelper" -Confirm:$false -ErrorAction SilentlyContinue
+            
+            # Register and start the task
+            Register-ScheduledTask -TaskName "ReddBlockHelper" -Action $action -Trigger $trigger -Principal $principal -Settings $settings
+            Start-ScheduledTask -TaskName "ReddBlockHelper"
+            
+            Write-Host "Helper installed successfully (using scheduled task)"
+        `;
+
+        // Execute the PowerShell script with admin privileges
+        sudo.exec(`powershell -ExecutionPolicy Bypass -Command "${installScript.replace(/"/g, '\\"')}"`,
+            { name: 'ReDD Block Website Blocker' },
+            (error, stdout, stderr) => {
+                if (error) {
+                    if (error.message && error.message.includes('User did not grant permission')) {
+                        reject(new Error('Permission denied'));
+                    } else {
+                        reject(error);
+                    }
+                } else {
+                    console.log('Helper installation output:', stdout);
+                    if (stderr) console.warn('Helper installation stderr:', stderr);
+                    resolve(true);
+                }
+            }
+        );
     });
 }
 

@@ -82,7 +82,7 @@ redd-block/
 
 - **macOS**: 10.15+ (Catalina or later)
 - **Linux**: systemd-based distributions (Ubuntu, Debian, Fedora, etc.)
-- **Windows**: Not yet supported
+- **Windows**: 10+ (experimental - uses Scheduled Tasks and PowerShell)
 
 ## License
 

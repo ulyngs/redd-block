@@ -254,51 +254,95 @@ ipcMain.handle('open-app-picker', async () => {
     return appName;
 });
 
-// Get running applications (macOS)
+// Get running applications (macOS and Windows)
 ipcMain.handle('get-running-apps', async () => {
-    if (process.platform !== 'darwin') return [];
+    if (process.platform === 'darwin') {
+        return new Promise((resolve) => {
+            const script = `
+          const apps = Application("System Events").processes.whose({backgroundOnly: false}).name();
+          JSON.stringify(apps);
+        `;
 
-    return new Promise((resolve) => {
-        const script = `
-      const apps = Application("System Events").processes.whose({backgroundOnly: false}).name();
-      JSON.stringify(apps);
-    `;
-
-        exec(`osascript -l JavaScript -e '${script}'`, (error, stdout) => {
-            if (error) {
-                log.error('Error getting running apps:', error);
-                resolve([]);
-                return;
-            }
-            try {
-                resolve(JSON.parse(stdout));
-            } catch (e) {
-                resolve([]);
-            }
+            exec(`osascript -l JavaScript -e '${script}'`, (error, stdout) => {
+                if (error) {
+                    log.error('Error getting running apps:', error);
+                    resolve([]);
+                    return;
+                }
+                try {
+                    resolve(JSON.parse(stdout));
+                } catch (e) {
+                    resolve([]);
+                }
+            });
         });
-    });
+    } else if (process.platform === 'win32') {
+        return new Promise((resolve) => {
+            const psScript = `Get-Process | Where-Object { $_.MainWindowTitle -ne '' } | Select-Object -ExpandProperty ProcessName -Unique | ConvertTo-Json`;
+            exec(`powershell -ExecutionPolicy Bypass -Command "${psScript}"`, (error, stdout) => {
+                if (error) {
+                    log.error('Error getting running apps:', error);
+                    resolve([]);
+                    return;
+                }
+                try {
+                    const result = JSON.parse(stdout);
+                    // Ensure we always return an array
+                    resolve(Array.isArray(result) ? result : [result]);
+                } catch (e) {
+                    resolve([]);
+                }
+            });
+        });
+    }
+    return [];
 });
 
-// Minimize an application (macOS)
+// Minimize an application (macOS and Windows)
 ipcMain.handle('minimize-app', async (event, appName) => {
-    if (process.platform !== 'darwin') return false;
+    if (process.platform === 'darwin') {
+        return new Promise((resolve) => {
+            const script = `
+          tell application "System Events"
+            set visible of process "${appName}" to false
+          end tell
+        `;
 
-    return new Promise((resolve) => {
-        const script = `
-      tell application "System Events"
-        set visible of process "${appName}" to false
-      end tell
-    `;
-
-        exec(`osascript -e '${script}'`, (error) => {
-            if (error) {
-                log.error('Error minimizing app:', error);
-                resolve(false);
-                return;
-            }
-            resolve(true);
+            exec(`osascript -e '${script}'`, (error) => {
+                if (error) {
+                    log.error('Error minimizing app:', error);
+                    resolve(false);
+                    return;
+                }
+                resolve(true);
+            });
         });
-    });
+    } else if (process.platform === 'win32') {
+        return new Promise((resolve) => {
+            const psScript = `
+                Add-Type -TypeDefinition @"
+                    using System;
+                    using System.Runtime.InteropServices;
+                    public class Win32 {
+                        [DllImport("user32.dll")]
+                        public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                    }
+"@
+                Get-Process -Name "${appName}" -ErrorAction SilentlyContinue | ForEach-Object {
+                    [Win32]::ShowWindow($_.MainWindowHandle, 6) # SW_MINIMIZE = 6
+                }
+            `;
+            exec(`powershell -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`, (error) => {
+                if (error) {
+                    log.error('Error minimizing app:', error);
+                    resolve(false);
+                    return;
+                }
+                resolve(true);
+            });
+        });
+    }
+    return false;
 });
 
 // Block websites using SelfControl-style dual approach:
@@ -677,7 +721,7 @@ function startBlockingInterval() {
         }
 
         // Minimize blocked apps
-        if (process.platform === 'darwin') {
+        if (process.platform === 'darwin' || process.platform === 'win32') {
             const now = Date.now();
             const blockedApps = new Set();
 
@@ -694,36 +738,64 @@ function startBlockingInterval() {
             if (blockedApps.size > 0) {
                 log.info('Checking for blocked apps:', Array.from(blockedApps));
 
-                // Get running apps and minimize blocked ones
-                const script = `
-          const apps = Application("System Events").processes.whose({backgroundOnly: false}).name();
-          JSON.stringify(apps);
-        `;
+                if (process.platform === 'darwin') {
+                    // macOS: Use AppleScript to hide apps
+                    const script = `
+              const apps = Application("System Events").processes.whose({backgroundOnly: false}).name();
+              JSON.stringify(apps);
+            `;
 
-                exec(`osascript -l JavaScript -e '${script}'`, (error, stdout) => {
-                    if (error) {
-                        log.error('Error getting running apps:', error);
-                        return;
-                    }
-                    try {
-                        const runningApps = JSON.parse(stdout);
-                        runningApps.forEach(appName => {
-                            if (blockedApps.has(appName)) {
-                                log.info('Hiding blocked app:', appName);
-                                const hideScript = `
-                  tell application "System Events"
-                    set visible of process "${appName}" to false
-                  end tell
-                `;
-                                exec(`osascript -e '${hideScript}'`, (err) => {
-                                    if (err) log.error('Error hiding app:', err);
-                                });
-                            }
-                        });
-                    } catch (e) {
-                        log.error('Error parsing running apps:', e);
-                    }
-                });
+                    exec(`osascript -l JavaScript -e '${script}'`, (error, stdout) => {
+                        if (error) {
+                            log.error('Error getting running apps:', error);
+                            return;
+                        }
+                        try {
+                            const runningApps = JSON.parse(stdout);
+                            runningApps.forEach(appName => {
+                                if (blockedApps.has(appName)) {
+                                    log.info('Hiding blocked app:', appName);
+                                    const hideScript = `
+                      tell application "System Events"
+                        set visible of process "${appName}" to false
+                      end tell
+                    `;
+                                    exec(`osascript -e '${hideScript}'`, (err) => {
+                                        if (err) log.error('Error hiding app:', err);
+                                    });
+                                }
+                            });
+                        } catch (e) {
+                            log.error('Error parsing running apps:', e);
+                        }
+                    });
+                } else if (process.platform === 'win32') {
+                    // Windows: Use PowerShell to minimize windows
+                    const appsArray = Array.from(blockedApps).map(a => `"${a}"`).join(',');
+                    const psScript = `
+                        $blockedApps = @(${appsArray})
+                        $shell = New-Object -ComObject Shell.Application
+                        Get-Process | Where-Object { $blockedApps -contains $_.ProcessName } | ForEach-Object {
+                            try {
+                                $shell.MinimizeAll()
+                                $_.MainWindowHandle | ForEach-Object {
+                                    Add-Type -TypeDefinition @"
+                                        using System;
+                                        using System.Runtime.InteropServices;
+                                        public class Win32 {
+                                            [DllImport("user32.dll")]
+                                            public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+                                        }
+"@
+                                    [Win32]::ShowWindow($_, 6) # SW_MINIMIZE = 6
+                                }
+                            } catch {}
+                        }
+                    `;
+                    exec(`powershell -ExecutionPolicy Bypass -Command "${psScript.replace(/"/g, '\\"')}"`, (err) => {
+                        if (err) log.error('Error minimizing Windows apps:', err);
+                    });
+                }
             }
         }
     }, 500); // Check every 500ms for responsive app blocking

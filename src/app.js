@@ -1164,6 +1164,48 @@ async function updateHostsFile(silent = false) {
         return { success: true, deferred: true };
     }
 
+    // Try to use helper daemon first (works on all platforms)
+    try {
+        console.log('[updateHostsFile] Checking helper status...');
+        const status = await ipcRenderer.invoke('check-helper-status');
+        console.log('[updateHostsFile] Helper status:', status);
+
+        if (status.running) {
+            console.log('[updateHostsFile] Helper running, using helper to update blocks');
+            helperAvailable = true;
+
+            if (domainsArray.length === 0) {
+                // Clear all blocks via helper
+                const result = await ipcRenderer.invoke('clear-block-via-helper');
+                if (result && result.success) {
+                    lastBlockedDomains = allDomains;
+                }
+                return result || { success: true };
+            } else {
+                // Find the latest end time among active blocks
+                const latestEndTime = Math.max(...appData.activeBlocks
+                    .filter(b => b.startTime <= now && b.endTime > now)
+                    .map(b => b.endTime));
+
+                const result = await ipcRenderer.invoke('start-block-via-helper', {
+                    domains: domainsArray,
+                    endTime: latestEndTime,
+                    blocklistId: 'combined' // Multiple blocklists combined
+                });
+                if (result && result.success) {
+                    lastBlockedDomains = allDomains;
+                }
+                return result || { success: true };
+            }
+        } else {
+            console.log('[updateHostsFile] Helper NOT running, falling back');
+        }
+    } catch (e) {
+        console.warn('Helper not available, falling back to direct method:', e);
+    }
+
+    // Fallback to direct hosts file modification (macOS)
+    console.log('[updateHostsFile] Calling fallback block-websites');
     const result = await ipcRenderer.invoke('block-websites', domainsArray);
 
     if (result && result.success) {

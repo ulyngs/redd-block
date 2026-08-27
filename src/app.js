@@ -94,7 +94,7 @@ import {
     toggleSchedulePanelOverlayDropdown,
 } from './schedule-overlay.js';
 import { applyModalBlocklistTint, applyOverrideTypeUi, closeBlocklistModal, closeOverrideModal, closePauseModal, closeScheduleConfirmModal, closeStartBlockConfirmModal, deselectBlocklist, handleBlocklistSelect, handlePauseBlockButtonClick, openBlocklistModal, openPauseModal, openResumeConfirmation, proceedWithBlock, proceedWithPause, proceedWithSchedule, proceedWithScheduleEdit, refreshSelectedBlocklistUi, renderScheduleConfirmSegments, setBtnActionLabel, setOverrideCountMaxMode, setStartBlockBtnLeadingIcon, setStartConfirmPrimaryLabel, startBlock, syncAllStopBtnLabelFits, syncOverrideCountUi, syncPauseDurationRowLayout, updateOverridePreview, updatePauseRestartTime, openOverrideModal, openScheduleOverrideModal, showScheduleConfirmModal, showScheduleEditConfirmModal, syncStopBtnLabelFit, setStartBtnBlocklistInfo } from './confirm-modals.js';
-import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft } from './blocklists.js';
+import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft, setUndoToastMessage } from './blocklists.js';
 import {
     getSelectedBlocklistModalMode,
     getBlocklistCreateKind,
@@ -3289,12 +3289,18 @@ export function applySettingsLanguage() {
     setText('schedule-confirm-override-header', tSettings('startScheduleHoldHeader'));
     setText('cancel-schedule-confirm-btn', tSettings('cancel'));
     setStartConfirmPrimaryLabel('proceed-schedule-confirm-btn', tSettings('startSchedule'));
-    setText('undo-toast-btn', tSettings('undo'));
-    const undoToastMsg = document.getElementById('undo-toast-message');
-    if (undoToastMsg && pendingDelete?.blocklist) {
-        undoToastMsg.textContent = tSettingsFmt('deleteUndoToastFmt', { name: pendingDelete.blocklist.name });
-    } else if (undoToastMsg && pendingSegmentDelete) {
-        undoToastMsg.textContent = tSettings('deleteSegmentUndoToast');
+    setText('undo-toast-btn-label', tSettings('undo'));
+    if (pendingDelete?.blocklist) {
+        setUndoToastMessage(
+            tSettings('deleteUndoToastPrefix'),
+            pendingDelete.blocklist.name,
+            tSettings('deleteUndoToastSuffix'),
+        );
+    } else if (pendingSegmentDelete) {
+        setUndoToastMessage(
+            tSettings('deleteSegmentUndoToastPrefix'),
+            tSettings('deleteSegmentUndoToastEmphasis'),
+        );
     }
     setText('override-all-title', tSettings('overrideAllTitle'));
     setText('override-all-warning-strong', tSettings('overrideAllWarningStrong'));

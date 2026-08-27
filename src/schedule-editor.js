@@ -6,7 +6,7 @@ import { isBlockAlwaysOn, ensureIOSBlocklistSelectionReady } from './blocklist-u
 import { ensureIOSAllowlistStartable } from './allowlist-ios.js';
 import { isNonRepeatingSchedule, isSchedulePausedNow, resolveOneShotOccurrences } from './schedule-engine.js';
 import { saveData } from './persistence.js';
-import { clearPendingScheduleDraft, commitDelete, pendingDelete, renderBlocklists, undoDelete } from './blocklists.js';
+import { clearPendingScheduleDraft, commitDelete, dismissUndoToast, pendingDelete, renderBlocklists, showUndoToast, undoDelete } from './blocklists.js';
 import { getLiveTimePickerContainer, handleTimeChange } from './confirm-modals.js';
 import { disableScheduleControls, disableTimeControls, pad, parseEndTimeBoundedInt, scrollPopoverOptionIntoView, updateDurationQuickBtns } from './time-inputs.js';
 import { syncSchedulePanelOverlayControls } from './schedule-overlay.js';
@@ -18,22 +18,19 @@ import { openScheduleOverrideModal, setBtnActionLabel, setStartBlockBtnLeadingIc
 
 export const TIME_SEPARATOR_ARROW_HTML = '<span class="time-separator" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg></span>';
 
-const SEGMENT_DELETE_UNDO_MS = 5000;
 export let pendingSegmentDelete = null;
 
 export function commitSegmentDelete() {
     if (!pendingSegmentDelete) return;
-    clearTimeout(pendingSegmentDelete.timeoutId);
-    document.getElementById('undo-toast')?.classList.add('hidden');
+    dismissUndoToast();
     pendingSegmentDelete = null;
 }
 
 export function undoSegmentDelete() {
     if (!pendingSegmentDelete) return;
-    clearTimeout(pendingSegmentDelete.timeoutId);
     const { segment, index } = pendingSegmentDelete;
     pendingSegmentDelete = null;
-    document.getElementById('undo-toast')?.classList.add('hidden');
+    dismissUndoToast();
 
     const restored = {
         ...segment,
@@ -66,13 +63,13 @@ export function handleUndoToastClick() {
 }
 
 function showSegmentDeleteUndoToast(segment, index) {
-    const toast = document.getElementById('undo-toast');
-    const message = document.getElementById('undo-toast-message');
-    if (!toast || !message) return;
-    message.textContent = tSettings('deleteSegmentUndoToast');
-    toast.classList.remove('hidden');
-    const timeoutId = setTimeout(commitSegmentDelete, SEGMENT_DELETE_UNDO_MS);
-    pendingSegmentDelete = { segment, index, timeoutId };
+    showUndoToast(
+        tSettings('deleteSegmentUndoToastPrefix'),
+        tSettings('deleteSegmentUndoToastEmphasis'),
+        '',
+        () => commitSegmentDelete(),
+    );
+    pendingSegmentDelete = { segment, index };
 }
 
 function scheduleSegmentsMatch(a, b) {

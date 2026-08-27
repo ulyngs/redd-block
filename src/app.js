@@ -77,7 +77,8 @@ import {
 import {
     addScheduleSegment, discardSchedulePendingChanges, getCommittedScheduleSegmentCount,
     getDefaultScheduleSegments, getInitialExpandedScheduleSegmentIndex, handleRepeatDateChange,
-    handleRepeatOptionClick, handleSegmentDayToggle, rebuildScheduleSegments,
+    handleRepeatOptionClick, handleSegmentDayToggle, handleUndoToastClick, pendingSegmentDelete,
+    rebuildScheduleSegments,
     saveSchedulePendingChanges, setAlwaysOnMode, setScheduleMode, setupAllowEditsBetweenBlocksToggle,
     startSchedule, toggleRepeatDropdown, updateScheduleButtonState, isScheduleSegmentActiveNow,
     formatDateForDisplay,
@@ -93,7 +94,7 @@ import {
     toggleSchedulePanelOverlayDropdown,
 } from './schedule-overlay.js';
 import { applyModalBlocklistTint, applyOverrideTypeUi, closeBlocklistModal, closeOverrideModal, closePauseModal, closeScheduleConfirmModal, closeStartBlockConfirmModal, deselectBlocklist, handleBlocklistSelect, handlePauseBlockButtonClick, openBlocklistModal, openPauseModal, openResumeConfirmation, proceedWithBlock, proceedWithPause, proceedWithSchedule, proceedWithScheduleEdit, refreshSelectedBlocklistUi, renderScheduleConfirmSegments, setBtnActionLabel, setOverrideCountMaxMode, setStartBlockBtnLeadingIcon, setStartConfirmPrimaryLabel, startBlock, syncAllStopBtnLabelFits, syncOverrideCountUi, syncPauseDurationRowLayout, updateOverridePreview, updatePauseRestartTime, openOverrideModal, openScheduleOverrideModal, showScheduleConfirmModal, showScheduleEditConfirmModal, syncStopBtnLabelFit, setStartBtnBlocklistInfo } from './confirm-modals.js';
-import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, undoDelete, deleteBlocklist, clearPendingScheduleDraft, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft } from './blocklists.js';
+import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft } from './blocklists.js';
 import {
     getSelectedBlocklistModalMode,
     getBlocklistCreateKind,
@@ -596,7 +597,9 @@ function setupEventListeners() {
             e.target.closest('.title-bar') ||
             e.target.closest('.week-calendar-section') ||
             e.target.closest('.time-popover') ||
-            e.target.closest('.time-part')) {
+            e.target.closest('.time-part') ||
+            e.target.closest('.undo-toast') ||
+            e.target.closest('.zoom-toast')) {
             return;
         }
 
@@ -753,7 +756,10 @@ function setupEventListeners() {
     setupOverrideModalListeners();
 
     // Undo toast button
-    document.getElementById('undo-toast-btn')?.addEventListener('click', undoDelete);
+    document.getElementById('undo-toast-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleUndoToastClick();
+    });
 
     // Start block confirmation modal buttons
     document.getElementById('cancel-start-confirm-btn')?.addEventListener('click', closeStartBlockConfirmModal);
@@ -3287,6 +3293,8 @@ export function applySettingsLanguage() {
     const undoToastMsg = document.getElementById('undo-toast-message');
     if (undoToastMsg && pendingDelete?.blocklist) {
         undoToastMsg.textContent = tSettingsFmt('deleteUndoToastFmt', { name: pendingDelete.blocklist.name });
+    } else if (undoToastMsg && pendingSegmentDelete) {
+        undoToastMsg.textContent = tSettings('deleteSegmentUndoToast');
     }
     setText('override-all-title', tSettings('overrideAllTitle'));
     setText('override-all-warning-strong', tSettings('overrideAllWarningStrong'));

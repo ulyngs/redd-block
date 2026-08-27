@@ -6,7 +6,7 @@ import { isBlockAlwaysOn, ensureIOSBlocklistSelectionReady } from './blocklist-u
 import { ensureIOSAllowlistStartable } from './allowlist-ios.js';
 import { isNonRepeatingSchedule, isSchedulePausedNow, resolveOneShotOccurrences } from './schedule-engine.js';
 import { saveData } from './persistence.js';
-import { clearPendingScheduleDraft, renderBlocklists } from './blocklists.js';
+import { clearPendingScheduleDraft, commitDelete, pendingDelete, renderBlocklists, undoDelete } from './blocklists.js';
 import { getLiveTimePickerContainer, handleTimeChange } from './confirm-modals.js';
 import { disableScheduleControls, disableTimeControls, pad, parseEndTimeBoundedInt, scrollPopoverOptionIntoView, updateDurationQuickBtns } from './time-inputs.js';
 import { syncSchedulePanelOverlayControls } from './schedule-overlay.js';
@@ -17,6 +17,78 @@ import { updateWindowHeight } from './blocking-platform.js';
 import { openScheduleOverrideModal, setBtnActionLabel, setStartBlockBtnLeadingIcon, setStartBtnBlocklistInfo, showScheduleConfirmModal, showScheduleEditConfirmModal, syncPauseButtonForSelectedBlocklist, syncStopBtnLabelFit } from './confirm-modals.js';
 
 export const TIME_SEPARATOR_ARROW_HTML = '<span class="time-separator" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"></path><path d="M13 6l6 6-6 6"></path></svg></span>';
+
+const SEGMENT_DELETE_UNDO_MS = 5000;
+export let pendingSegmentDelete = null;
+
+export function commitSegmentDelete() {
+    if (!pendingSegmentDelete) return;
+    clearTimeout(pendingSegmentDelete.timeoutId);
+    document.getElementById('undo-toast')?.classList.add('hidden');
+    pendingSegmentDelete = null;
+}
+
+export function undoSegmentDelete() {
+    if (!pendingSegmentDelete) return;
+    clearTimeout(pendingSegmentDelete.timeoutId);
+    const { segment, index } = pendingSegmentDelete;
+    pendingSegmentDelete = null;
+    document.getElementById('undo-toast')?.classList.add('hidden');
+
+    const restored = {
+        ...segment,
+        days: Array.isArray(segment.days) ? [...segment.days] : segment.days,
+    };
+    state.scheduleSegments.splice(index, 0, restored);
+    sortScheduleSegments();
+    const restoredIndex = findScheduleSegmentIndex(restored);
+
+    if (restoredIndex >= 0) {
+        expandScheduleSegment(restoredIndex);
+    } else {
+        rebuildScheduleSegments();
+    }
+
+    if (state.activeScheduleSegmentCount > 0 && !canEditScheduleBetweenBlocks()) {
+        disableScheduleControls(true);
+    }
+    handleTimeChange();
+    updateScheduleButtonState();
+    void syncUnlockedScheduleEditsToData();
+}
+
+export function handleUndoToastClick() {
+    if (pendingSegmentDelete) {
+        undoSegmentDelete();
+        return;
+    }
+    undoDelete();
+}
+
+function showSegmentDeleteUndoToast(segment, index) {
+    const toast = document.getElementById('undo-toast');
+    const message = document.getElementById('undo-toast-message');
+    if (!toast || !message) return;
+    message.textContent = tSettings('deleteSegmentUndoToast');
+    toast.classList.remove('hidden');
+    const timeoutId = setTimeout(commitSegmentDelete, SEGMENT_DELETE_UNDO_MS);
+    pendingSegmentDelete = { segment, index, timeoutId };
+}
+
+function scheduleSegmentsMatch(a, b) {
+    return a.startHour === b.startHour
+        && a.startMinute === b.startMinute
+        && a.endHour === b.endHour
+        && a.endMinute === b.endMinute
+        && arraysEqual(
+            [...(a.days || [])].sort((x, y) => x - y),
+            [...(b.days || [])].sort((x, y) => x - y),
+        );
+}
+
+function findScheduleSegmentIndex(segment) {
+    return state.scheduleSegments.findIndex((seg) => scheduleSegmentsMatch(seg, segment));
+}
 export const SEGMENT_SUMMARY_CLOCK_ICON = '<svg class="segment-summary-clock" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>';
 export const SEGMENT_SUMMARY_CHEVRON_ICON = '<svg class="segment-summary-chevron" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polyline points="6 9 12 15 18 9"></polyline></svg>';
 
@@ -803,6 +875,14 @@ export function removeScheduleSegment(index) {
 
     if (state.scheduleSegments.length <= 1) return; // Always keep at least one
 
+    if (pendingSegmentDelete) commitSegmentDelete();
+    if (pendingDelete) commitDelete();
+
+    const deletedSegment = {
+        ...state.scheduleSegments[index],
+        days: [...(state.scheduleSegments[index].days || [])],
+    };
+
     // Remove from state
     state.scheduleSegments.splice(index, 1);
 
@@ -824,6 +904,8 @@ export function removeScheduleSegment(index) {
     handleTimeChange();
     updateScheduleButtonState();
     void syncUnlockedScheduleEditsToData();
+
+    showSegmentDeleteUndoToast(deletedSegment, index);
 }
 
 // Sort schedule segments chronologically by start time.

@@ -805,6 +805,7 @@ export const SETTINGS_TRANSLATIONS = {
         overrideAllInstruction: 'To do this, type the following:',
         overrideAll: 'Stop All',
         deleteUndoToastFmt: 'Deleted "{name}"',
+        deleteSegmentUndoToast: 'Deleted time segment',
         undo: 'Undo',
         // Settings
         settingsTitle: 'Settings',
@@ -1681,6 +1682,7 @@ export const SETTINGS_TRANSLATIONS = {
         overrideAllInstruction: 'For at gøre dette, skriv følgende:',
         overrideAll: 'Stop alle',
         deleteUndoToastFmt: 'Slettet "{name}"',
+        deleteSegmentUndoToast: 'Tidssegment slettet',
         undo: 'Fortryd',
         // Settings
         settingsTitle: 'Indstillinger',
@@ -2513,6 +2515,7 @@ export const SETTINGS_TRANSLATIONS = {
         overrideAllInstruction: '要执行此操作，请输入以下内容：',
         overrideAll: '全部停止',
         deleteUndoToastFmt: '已删除“{name}”',
+        deleteSegmentUndoToast: '已删除时间段',
         undo: '撤销',
         settingsTitle: '设置',
         settingsDone: '完成',

@@ -10,7 +10,7 @@ import { cloneIOSScreenTimeSelection, getBlocklistIOSScreenTimeSelection, getBlo
 import { isOneOffBlockEnforced, isSchedulePausedNow } from './schedule-engine.js';
 import { saveData, updateHostsFile } from './persistence.js';
 import { handleNowBlockingPause, handleNowBlockingStop, render, renderNowBlockingRow, renderScheduleVisibilityChips } from './render.js';
-import { canEditScheduleBetweenBlocks, isScheduleSegmentActiveNow } from './schedule-editor.js';
+import { canEditScheduleBetweenBlocks, commitSegmentDelete, isScheduleSegmentActiveNow } from './schedule-editor.js';
 import {
     BLOCKLIST_CARD_COMPACT_SCHEDULE_UPCOMING_CHARS,
     BLOCKLIST_NAME_MAX_LENGTH,
@@ -817,6 +817,7 @@ export async function deleteBlocklist(id) {
     if (pendingDelete) {
         commitDelete();
     }
+    commitSegmentDelete();
 
     // Store the blocklist and any active blocks for potential undo
     const activeBlocksToRemove = state.appData.activeBlocks.filter(b => b.blocklistId === id);

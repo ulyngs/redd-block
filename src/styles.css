@@ -13120,6 +13120,35 @@ body:not(.handset-device) .start-confirm-modal{
     padding: 28px;
 }
 
+/* Desktop popup: scroll body when content exceeds viewport (matches blocklist modal). */
+body:not(.handset-device) #start-schedule-confirm-modal .modal-content,
+body:not(.handset-device) #start-block-confirm-modal .modal-content{
+    display: flex;
+    flex-direction: column;
+    max-height: 95vh;
+    overflow: hidden;
+}
+
+body:not(.handset-device) #start-schedule-confirm-modal .mobile-modal-scroll-body,
+body:not(.handset-device) #start-block-confirm-modal .mobile-modal-scroll-body{
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    margin-right: -28px;
+    padding-right: 28px;
+    box-sizing: border-box;
+}
+
+body:not(.handset-device) #start-schedule-confirm-modal .start-confirm-actions,
+body:not(.handset-device) #start-block-confirm-modal .start-confirm-actions{
+    flex-shrink: 0;
+    margin-top: 0;
+    padding-top: 12px;
+}
+
 .start-confirm-modal{
     padding: 28px;
 }

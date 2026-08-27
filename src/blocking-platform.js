@@ -1590,7 +1590,10 @@ export function setupHandsetModalScreens() {
         const scrollBody = document.createElement('div');
         scrollBody.className = 'mobile-modal-scroll-body';
         const keepFooterOutsideScroll =
-            modalId === 'blocklist-modal' || modalId === 'settings-modal';
+            modalId === 'blocklist-modal'
+            || modalId === 'settings-modal'
+            || modalId === 'start-block-confirm-modal'
+            || modalId === 'start-schedule-confirm-modal';
         while (header.nextSibling) {
             const node = header.nextSibling;
             if (

@@ -795,7 +795,7 @@ export const SETTINGS_TRANSLATIONS = {
         confirmOverrideCustomPhraseFmt:
             'Type your custom message to exit: "<em>{customText}</em>".',
         confirmOverrideIntentionSuffix: 'That helps you stick with your intention.',
-        startSchedule: 'Start Schedule',
+        startSchedule: 'Start schedule',
         noDaysSelected: 'No days selected',
         runningSuffix: ' (Running)',
         // Override all

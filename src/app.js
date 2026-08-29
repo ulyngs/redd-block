@@ -31,7 +31,10 @@ import {
     cloneIOSScreenTimeSelection,
     hasUsableIOSScreenTimeSelection,
     formatIOSScreenTimeSelectionLabel,
+    getBlocklistIOSScreenTimeSelection,
     getBlocklistModalLockedApps,
+    mergeIOSScreenTimeSelectionAdditive,
+    resolveIOSScreenTimeSelectionForSave,
     blocklistNeedsIOSSelectionRefresh,
     ensureIOSBlocklistSelectionReady,
     normalizeBlocklist,
@@ -94,7 +97,7 @@ import {
     toggleSchedulePanelOverlayDropdown,
 } from './schedule-overlay.js';
 import { applyModalBlocklistTint, applyOverrideTypeUi, closeBlocklistModal, closeOverrideModal, closePauseModal, closeScheduleConfirmModal, closeStartBlockConfirmModal, deselectBlocklist, handleBlocklistSelect, handlePauseBlockButtonClick, openBlocklistModal, openPauseModal, openResumeConfirmation, proceedWithBlock, proceedWithPause, proceedWithSchedule, proceedWithScheduleEdit, refreshSelectedBlocklistUi, renderScheduleConfirmSegments, setBtnActionLabel, setOverrideCountMaxMode, setStartBlockBtnLeadingIcon, setStartConfirmPrimaryLabel, startBlock, syncAllStopBtnLabelFits, syncOverrideCountUi, syncPauseDurationRowLayout, updateOverridePreview, updatePauseRestartTime, openOverrideModal, openScheduleOverrideModal, showScheduleConfirmModal, showScheduleEditConfirmModal, syncStopBtnLabelFit, setStartBtnBlocklistInfo } from './confirm-modals.js';
-import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft, setUndoToastMessage } from './blocklists.js';
+import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, isBlocklistEditFrictionRequired, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft, setUndoToastMessage } from './blocklists.js';
 import {
     getSelectedBlocklistModalMode,
     getBlocklistCreateKind,
@@ -1287,6 +1290,29 @@ function setupModalListeners() {
         }
     });
 
+    /**
+     * The saved Screen Time selection the picker may not go below, or null when
+     * it is free to replace outright.
+     *
+     * Recomputed on every Browse tap rather than cached at modal-open time: a
+     * block can end, or a schedule segment begin, while the modal sits open.
+     *
+     * Deliberately the *persisted* selection, not the modal's working copy — a
+     * token added earlier in this same editing session was never enforced, so
+     * dropping it again is not a loosening (and matches how a freshly added tag
+     * on desktop keeps its remove button).
+     */
+    const getEnforcedIOSSelectionFloor = () => {
+        if (!state.isIOS) return null;
+        if (!state.editingBlocklistId) return null;
+        // Allow mode is deliberately excluded — see
+        // mergeIOSScreenTimeSelectionAdditive.
+        if (getSelectedBlocklistModalMode() !== 'blocklist') return null;
+        if (!isBlocklistEditFrictionRequired(state.editingBlocklistId)) return null;
+        const saved = state.appData?.blocklists?.find(bl => bl.id === state.editingBlocklistId);
+        return saved ? getBlocklistIOSScreenTimeSelection(saved) : null;
+    };
+
     // Browse button for modal
     const modalBrowseBtn = document.getElementById('modal-browse-apps-btn');
     if (state.isIOS && modalBrowseBtn) {
@@ -1300,27 +1326,38 @@ function setupModalListeners() {
                     initialCategoryTokenData: modalIOSScreenTimeSelection?.categoryTokens || [],
                     mode: getSelectedBlocklistModalMode()
                 });
+                // Non-null while enforcing: the picker becomes add-only, so a
+                // deselection inside it is ignored rather than saved.
+                const floor = getEnforcedIOSSelectionFloor();
                 if (!result.cancelled && (result.applicationCount > 0 || result.categoryCount > 0)) {
                     const previousSelection = cloneIOSScreenTimeSelection(modalIOSScreenTimeSelection);
                     pushModalUndo('ios-screentime-selection', () => {
                         modalIOSScreenTimeSelection = cloneIOSScreenTimeSelection(previousSelection);
                         window.renderModalTags();
                     });
-                    modalIOSScreenTimeSelection = normalizeIOSScreenTimeSelection({
+                    const picked = normalizeIOSScreenTimeSelection({
                         applicationTokens: result.applicationTokens || [],
                         categoryTokens: result.categoryTokens || [],
                         applicationCount: result.applicationCount || 0,
                         categoryCount: result.categoryCount || 0,
                         requiresReselection: false
                     });
+                    modalIOSScreenTimeSelection = floor
+                        ? mergeIOSScreenTimeSelectionAdditive(floor, picked)
+                        : picked;
                     window.renderModalTags();
                 } else if (!result.cancelled && modalIOSScreenTimeSelection) {
+                    // Deselecting everything and confirming — the fastest form
+                    // of the bypass. While enforcing it lands back on the floor
+                    // instead of clearing.
                     const previousSelection = cloneIOSScreenTimeSelection(modalIOSScreenTimeSelection);
                     pushModalUndo('ios-screentime-selection-clear', () => {
                         modalIOSScreenTimeSelection = cloneIOSScreenTimeSelection(previousSelection);
                         window.renderModalTags();
                     });
-                    modalIOSScreenTimeSelection = null;
+                    modalIOSScreenTimeSelection = floor
+                        ? mergeIOSScreenTimeSelectionAdditive(floor, null)
+                        : null;
                     window.renderModalTags();
                 }
             } catch (err) {
@@ -1768,6 +1805,21 @@ function setupModalListeners() {
             overrideDifficultyPayload.typeBeforeMax = state.lastOverrideTypeValueBeforeMaxDifficulty;
         }
 
+        // Save is the authoritative enforcement boundary. The picker and undo
+        // can leave a candidate that was valid while paused or between schedule
+        // segments; recompute friction now so a later resume/start cannot turn
+        // that stale candidate into a removal.
+        const iosScreenTimeSelectionForSave = resolveIOSScreenTimeSelectionForSave(
+            getBlocklistIOSScreenTimeSelection(existingBlocklistForSave),
+            modalIOSScreenTimeSelection,
+            {
+                mode,
+                editFrictionRequired: state.isIOS
+                    && !!state.editingBlocklistId
+                    && isBlocklistEditFrictionRequired(state.editingBlocklistId),
+            },
+        );
+
         // IMPORTANT: Create copies of the arrays, not references!
         const blocklist = {
             id: state.editingBlocklistId || generateId(),
@@ -1777,7 +1829,7 @@ function setupModalListeners() {
             emoji,
             websites: [...modalWebsites],
             apps: [...modalApps],
-            iosScreenTimeSelection: cloneIOSScreenTimeSelection(modalIOSScreenTimeSelection),
+            iosScreenTimeSelection: iosScreenTimeSelectionForSave,
             showItemDetails,
             alwaysShowInSchedule,
             overrideDifficulty: overrideDifficultyPayload,

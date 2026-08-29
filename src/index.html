@@ -2024,7 +2024,7 @@
                     <button id="cancel-schedule-confirm-btn" class="modal-btn cancel-btn">Cancel</button>
                     <button id="proceed-schedule-confirm-btn" class="modal-btn black-btn start-confirm-primary-btn">
                         <svg class="start-confirm-primary-icon" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="5 3 19 12 5 21 5 3"></polygon></svg>
-                        <span class="start-confirm-primary-label">Start Schedule</span>
+                        <span class="start-confirm-primary-label">Start schedule</span>
                     </button>
                 </div>
             </div>
@@ -2331,7 +2331,10 @@
         <!-- Undo Toast -->
         <div id="undo-toast" class="undo-toast hidden">
             <span id="undo-toast-message">Deleted blocklist</span>
-            <button id="undo-toast-btn" class="undo-btn">Undo</button>
+            <button id="undo-toast-btn" type="button" class="undo-btn">
+                <span id="undo-toast-btn-label" class="undo-btn-label">Undo</span>
+                <span id="undo-toast-countdown" class="undo-btn-countdown" aria-hidden="true">5</span>
+            </button>
         </div>
 
         <!-- Zoom Toast -->

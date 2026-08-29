@@ -218,6 +218,10 @@ currently running:
 - [ ] Edit → Browse → add an app → Done: the addition sticks (tightening stays
       free) and enforces after Save
 - [ ] Pause the block first → Browse → deselect: the removal now goes through
+- [ ] While paused, deselect → Done, then let the pause expire before Save: the
+      persisted selection is restored instead of loosening the resumed block
+- [ ] After enforcement resumes, undo a picker merge and Save: the persisted
+      selection still remains the floor
 - [ ] No block or schedule running → Browse → deselect: removal goes through
 
 ### 14.1 iOS allowlist matrix (Allow-mode focus spaces)

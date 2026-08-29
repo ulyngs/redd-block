@@ -13120,6 +13120,35 @@ body:not(.handset-device) .start-confirm-modal{
     padding: 28px;
 }
 
+/* Desktop popup: scroll body when content exceeds viewport (matches blocklist modal). */
+body:not(.handset-device) #start-schedule-confirm-modal .modal-content,
+body:not(.handset-device) #start-block-confirm-modal .modal-content{
+    display: flex;
+    flex-direction: column;
+    max-height: 95vh;
+    overflow: hidden;
+}
+
+body:not(.handset-device) #start-schedule-confirm-modal .mobile-modal-scroll-body,
+body:not(.handset-device) #start-block-confirm-modal .mobile-modal-scroll-body{
+    flex: 1;
+    min-height: 0;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+    margin-right: -28px;
+    padding-right: 28px;
+    box-sizing: border-box;
+}
+
+body:not(.handset-device) #start-schedule-confirm-modal .start-confirm-actions,
+body:not(.handset-device) #start-block-confirm-modal .start-confirm-actions{
+    flex-shrink: 0;
+    margin-top: 0;
+    padding-top: 12px;
+}
+
 .start-confirm-modal{
     padding: 28px;
 }
@@ -16942,14 +16971,19 @@ body.ios-phone #blocklist-modal .custom-swatch .custom-icon{
     bottom: 20px;
     left: 50%;
     transform: translateX(-50%);
-    background: var(--redd-navy);
-    color: white;
-    padding: 12px 20px;
-    border-radius: 8px;
+    background: #ffffff;
+    color: #2c2c35;
+    padding: 12px;
+    border: 1px solid #e1dcd6;
+    border-radius: 14px;
     display: flex;
     align-items: center;
     gap: 16px;
-    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    box-shadow: 0 8px 24px rgba(30, 45, 62, 0.12);
+    font-family: var(--font-body, 'Inter', sans-serif);
+    font-size: 16px;
+    line-height: 1.3;
+    font-weight: 400;
     z-index: 2000;
     animation: slideUp 0.3s ease;
 }
@@ -16960,18 +16994,10 @@ body.android .undo-toast {
 }
 
 body.dark-mode .undo-toast{
-    background: var(--redd-card);
-    color: var(--text-primary);
-    border: 1px solid var(--redd-border);
-}
-
-body.dark-mode .undo-btn{
-    background: var(--redd-teal);
-    color: var(--primary-btn-text);
-}
-
-body.dark-mode .undo-btn:hover{
-    background: var(--redd-teal-hover);
+    background: #28394f;
+    color: #c8d4e0;
+    border-color: rgba(255, 255, 255, 0.14);
+    box-shadow: 0 10px 28px rgba(0, 0, 0, 0.45);
 }
 
 .undo-toast.hidden{
@@ -16990,20 +17016,64 @@ body.dark-mode .undo-btn:hover{
     }
 }
 
-.undo-btn{
-    background: white;
-    color: var(--redd-navy);
-    border: none;
-    padding: 6px 14px;
-    border-radius: 6px;
+#undo-toast-message strong{
     font-weight: 600;
-    font-size: 15px;
+    color: #1e2d3e;
+}
+
+body.dark-mode #undo-toast-message strong{
+    color: #ffffff;
+}
+
+.undo-btn{
+    display: inline-flex;
+    align-items: center;
+    gap: 12px;
+    margin: 0;
+    padding: 8px 14px 8px 16px;
+    border: 1px solid #bfe3dd;
+    border-radius: 8px;
+    background: #e5f5f3;
+    color: #1f7a70;
+    font-family: inherit;
+    font-size: 16px;
+    line-height: 1.3;
+    font-weight: 600;
     cursor: pointer;
-    transition: all 0.2s ease;
+    transition: background-color 0.2s ease;
+}
+
+body.dark-mode .undo-btn{
+    background: rgba(42, 157, 143, 0.18);
+    border-color: rgba(63, 191, 174, 0.45);
+    color: #5fd3c2;
 }
 
 .undo-btn:hover{
-    background: hsl(210, 40%, 96%);
+    background: #d5efeb;
+}
+
+body.dark-mode .undo-btn:hover{
+    background: rgba(42, 157, 143, 0.3);
+}
+
+.undo-btn:hover .undo-btn-label{
+    text-decoration: underline;
+}
+
+.undo-btn-countdown{
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', monospace;
+    font-size: 15px;
+    line-height: 1;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+    color: inherit;
+    min-width: 1ch;
+}
+
+.undo-btn:focus-visible{
+    outline: none;
+    box-shadow: 0 0 0 3px rgba(42, 157, 143, 0.2);
 }
 
 /* Zoom Toast */

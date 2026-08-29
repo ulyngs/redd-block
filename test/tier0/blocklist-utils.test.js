@@ -13,6 +13,7 @@ import {
     normalizeBlocklist,
     normalizeIOSScreenTimeSelection,
     parseLegacyScreenTimeSummary,
+    resolveIOSScreenTimeSelectionForSave,
 } from '../../src/blocklist-utils.js';
 
 describe('protected apps and domains', () => {
@@ -307,5 +308,58 @@ describe('additive Screen Time merge (picker cannot remove while enforcing)', ()
         const merged = mergeIOSScreenTimeSelectionAdditive(stale, sel(['tok-x']));
         expect(merged.applicationTokens).toEqual(['tok-x']);
         expect(merged.requiresReselection).toBe(false);
+    });
+});
+
+describe('Screen Time selection at the save boundary', () => {
+    const sel = (apps = [], cats = []) => normalizeIOSScreenTimeSelection({
+        applicationTokens: apps,
+        categoryTokens: cats,
+        requiresReselection: false,
+    });
+
+    test('a schedule starting after the picker closes preserves the persisted floor', () => {
+        const saved = sel(['tok-instagram', 'tok-tiktok']);
+        const narrowedBeforeScheduleStarted = sel(['tok-tiktok']);
+
+        const resolved = resolveIOSScreenTimeSelectionForSave(
+            saved,
+            narrowedBeforeScheduleStarted,
+            { mode: 'blocklist', editFrictionRequired: true },
+        );
+
+        expect(resolved.applicationTokens).toEqual(['tok-instagram', 'tok-tiktok']);
+    });
+
+    test('save rejects an empty selection restored by undo once enforcement resumes', () => {
+        const saved = sel(['tok-instagram']);
+
+        const resolved = resolveIOSScreenTimeSelectionForSave(
+            saved,
+            null,
+            { mode: 'blocklist', editFrictionRequired: true },
+        );
+
+        expect(resolved.applicationTokens).toEqual(['tok-instagram']);
+    });
+
+    test('removal remains allowed while edit friction is not required', () => {
+        const resolved = resolveIOSScreenTimeSelectionForSave(
+            sel(['tok-instagram', 'tok-tiktok']),
+            sel(['tok-tiktok']),
+            { mode: 'blocklist', editFrictionRequired: false },
+        );
+
+        expect(resolved.applicationTokens).toEqual(['tok-tiktok']);
+    });
+
+    test('allow mode remains replacement-based', () => {
+        const resolved = resolveIOSScreenTimeSelectionForSave(
+            sel(['tok-instagram', 'tok-tiktok']),
+            sel(['tok-tiktok']),
+            { mode: 'allowlist', editFrictionRequired: true },
+        );
+
+        expect(resolved.applicationTokens).toEqual(['tok-tiktok']);
     });
 });

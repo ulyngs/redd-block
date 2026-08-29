@@ -234,6 +234,26 @@ export function mergeIOSScreenTimeSelectionAdditive(saved, picked) {
     });
 }
 
+/**
+ * Resolve the Screen Time selection at the final save boundary.
+ *
+ * The modal candidate can become stale after the picker closes or after undo:
+ * a schedule may start, or a pause may expire, before Save is pressed. Reapply
+ * the persisted block-mode floor at that moment so every UI path remains
+ * additive while edit friction is required. Allow mode deliberately remains
+ * replacement-based because adding allowed apps loosens enforcement there.
+ */
+export function resolveIOSScreenTimeSelectionForSave(
+    saved,
+    candidate,
+    { mode = 'blocklist', editFrictionRequired = false } = {},
+) {
+    if (mode === 'blocklist' && editFrictionRequired) {
+        return mergeIOSScreenTimeSelectionAdditive(saved, candidate);
+    }
+    return cloneIOSScreenTimeSelection(candidate);
+}
+
 export function ensureIOSBlocklistSelectionReady(blocklist, actionLabel) {
     if (!state.isIOS || !blocklistNeedsIOSSelectionRefresh(blocklist)) {
         return true;
@@ -408,4 +428,3 @@ export function collectActiveIOSManualBlockPayload(now = Date.now()) {
     }
     return out;
 }
-

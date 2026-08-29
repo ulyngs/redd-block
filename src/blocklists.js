@@ -10,7 +10,7 @@ import { cloneIOSScreenTimeSelection, getBlocklistIOSScreenTimeSelection, getBlo
 import { isOneOffBlockEnforced, isSchedulePausedNow } from './schedule-engine.js';
 import { saveData, updateHostsFile } from './persistence.js';
 import { handleNowBlockingPause, handleNowBlockingStop, render, renderNowBlockingRow, renderScheduleVisibilityChips } from './render.js';
-import { canEditScheduleBetweenBlocks, isScheduleSegmentActiveNow } from './schedule-editor.js';
+import { canEditScheduleBetweenBlocks, commitSegmentDelete, isScheduleSegmentActiveNow } from './schedule-editor.js';
 import {
     BLOCKLIST_CARD_COMPACT_SCHEDULE_UPCOMING_CHARS,
     BLOCKLIST_NAME_MAX_LENGTH,
@@ -784,7 +784,58 @@ export function setupBlocklistsImportExportButtons() {
 }
 
 // Delete blocklist with undo support
-export let pendingDelete = null; // { blocklist, activeBlocks, timeoutId }
+export let pendingDelete = null; // { blocklist, activeBlocks }
+
+export const UNDO_TOAST_SECONDS = 5;
+let undoToastCountdownHandle = null;
+
+function stopUndoToastCountdown() {
+    if (undoToastCountdownHandle) {
+        clearInterval(undoToastCountdownHandle);
+        undoToastCountdownHandle = null;
+    }
+}
+
+export function dismissUndoToast() {
+    stopUndoToastCountdown();
+    document.getElementById('undo-toast')?.classList.add('hidden');
+}
+
+function startUndoToastCountdown(onExpire) {
+    stopUndoToastCountdown();
+    const countEl = document.getElementById('undo-toast-countdown');
+    let remaining = UNDO_TOAST_SECONDS;
+    if (countEl) countEl.textContent = String(remaining);
+
+    undoToastCountdownHandle = setInterval(() => {
+        remaining -= 1;
+        if (countEl) countEl.textContent = String(remaining);
+        if (remaining <= 0) {
+            stopUndoToastCountdown();
+            onExpire();
+        }
+    }, 1000);
+}
+
+export function setUndoToastMessage(prefix, emphasis, suffix = '') {
+    const toast = document.getElementById('undo-toast');
+    const message = document.getElementById('undo-toast-message');
+    if (!toast || !message) return;
+    message.replaceChildren();
+    if (prefix) message.append(document.createTextNode(prefix));
+    if (emphasis) {
+        const strong = document.createElement('strong');
+        strong.textContent = emphasis;
+        message.append(strong);
+    }
+    if (suffix) message.append(document.createTextNode(suffix));
+    toast.classList.remove('hidden');
+}
+
+export function showUndoToast(prefix, emphasis, suffix, onExpire) {
+    setUndoToastMessage(prefix, emphasis, suffix);
+    startUndoToastCountdown(onExpire);
+}
 
 export async function deleteBlocklist(id) {
     const blocklist = state.appData.blocklists.find(bl => bl.id === id);
@@ -817,6 +868,7 @@ export async function deleteBlocklist(id) {
     if (pendingDelete) {
         commitDelete();
     }
+    commitSegmentDelete();
 
     // Store the blocklist and any active blocks for potential undo
     const activeBlocksToRemove = state.appData.activeBlocks.filter(b => b.blocklistId === id);
@@ -838,43 +890,32 @@ export async function deleteBlocklist(id) {
     // Re-render immediately
     render();
 
-    // Show undo toast
-    const toast = document.getElementById('undo-toast');
-    const message = document.getElementById('undo-toast-message');
-    message.textContent = tSettingsFmt('deleteUndoToastFmt', { name: blocklist.name });
-    toast.classList.remove('hidden');
-
-    // Set up auto-commit after 5 seconds
-    const timeoutId = setTimeout(() => {
-        commitDelete();
-    }, 5000);
+    showUndoToast(
+        tSettings('deleteUndoToastPrefix'),
+        blocklist.name,
+        tSettings('deleteUndoToastSuffix'),
+        () => commitDelete(),
+    );
 
     pendingDelete = {
         blocklist,
         activeBlocks: activeBlocksToRemove,
-        timeoutId
     };
 }
 
 export function commitDelete() {
     if (!pendingDelete) return;
 
-    clearTimeout(pendingDelete.timeoutId);
-
-    // Update hosts if needed
     if (pendingDelete.activeBlocks.length > 0) {
         updateHostsFile();
     }
 
-    // Hide toast
-    document.getElementById('undo-toast').classList.add('hidden');
+    dismissUndoToast();
     pendingDelete = null;
 }
 
 export function undoDelete() {
     if (!pendingDelete) return;
-
-    clearTimeout(pendingDelete.timeoutId);
 
     // Restore the blocklist and active blocks
     state.appData.blocklists.push(pendingDelete.blocklist);
@@ -883,8 +924,7 @@ export function undoDelete() {
     });
     void saveData();
 
-    // Hide toast
-    document.getElementById('undo-toast').classList.add('hidden');
+    dismissUndoToast();
     pendingDelete = null;
 
     // Re-render

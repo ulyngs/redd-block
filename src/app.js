@@ -34,6 +34,7 @@ import {
     getBlocklistIOSScreenTimeSelection,
     getBlocklistModalLockedApps,
     mergeIOSScreenTimeSelectionAdditive,
+    resolveIOSScreenTimeSelectionForSave,
     blocklistNeedsIOSSelectionRefresh,
     ensureIOSBlocklistSelectionReady,
     normalizeBlocklist,
@@ -79,7 +80,8 @@ import {
 import {
     addScheduleSegment, discardSchedulePendingChanges, getCommittedScheduleSegmentCount,
     getDefaultScheduleSegments, getInitialExpandedScheduleSegmentIndex, handleRepeatDateChange,
-    handleRepeatOptionClick, handleSegmentDayToggle, rebuildScheduleSegments,
+    handleRepeatOptionClick, handleSegmentDayToggle, handleUndoToastClick, pendingSegmentDelete,
+    rebuildScheduleSegments,
     saveSchedulePendingChanges, setAlwaysOnMode, setScheduleMode, setupAllowEditsBetweenBlocksToggle,
     startSchedule, toggleRepeatDropdown, updateScheduleButtonState, isScheduleSegmentActiveNow,
     formatDateForDisplay,
@@ -95,7 +97,7 @@ import {
     toggleSchedulePanelOverlayDropdown,
 } from './schedule-overlay.js';
 import { applyModalBlocklistTint, applyOverrideTypeUi, closeBlocklistModal, closeOverrideModal, closePauseModal, closeScheduleConfirmModal, closeStartBlockConfirmModal, deselectBlocklist, handleBlocklistSelect, handlePauseBlockButtonClick, openBlocklistModal, openPauseModal, openResumeConfirmation, proceedWithBlock, proceedWithPause, proceedWithSchedule, proceedWithScheduleEdit, refreshSelectedBlocklistUi, renderScheduleConfirmSegments, setBtnActionLabel, setOverrideCountMaxMode, setStartBlockBtnLeadingIcon, setStartConfirmPrimaryLabel, startBlock, syncAllStopBtnLabelFits, syncOverrideCountUi, syncPauseDurationRowLayout, updateOverridePreview, updatePauseRestartTime, openOverrideModal, openScheduleOverrideModal, showScheduleConfirmModal, showScheduleEditConfirmModal, syncStopBtnLabelFit, setStartBtnBlocklistInfo } from './confirm-modals.js';
-import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, undoDelete, deleteBlocklist, clearPendingScheduleDraft, isBlocklistEditFrictionRequired, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft } from './blocklists.js';
+import { renderBlocklists, autoSelectSoleBlocklist, closeAllBlocklistMenus, truncateBlocklistName, setupBlocklistsImportExportButtons, duplicateBlocklist, getNextCopyName, deleteBlocklist, clearPendingScheduleDraft, isBlocklistEditFrictionRequired, pendingDelete, saveBlocklistOrderFromDOM, getBlocklistScheduleDraft, saveBlocklistScheduleDraft, setUndoToastMessage } from './blocklists.js';
 import {
     getSelectedBlocklistModalMode,
     getBlocklistCreateKind,
@@ -598,7 +600,9 @@ function setupEventListeners() {
             e.target.closest('.title-bar') ||
             e.target.closest('.week-calendar-section') ||
             e.target.closest('.time-popover') ||
-            e.target.closest('.time-part')) {
+            e.target.closest('.time-part') ||
+            e.target.closest('.undo-toast') ||
+            e.target.closest('.zoom-toast')) {
             return;
         }
 
@@ -755,7 +759,10 @@ function setupEventListeners() {
     setupOverrideModalListeners();
 
     // Undo toast button
-    document.getElementById('undo-toast-btn')?.addEventListener('click', undoDelete);
+    document.getElementById('undo-toast-btn')?.addEventListener('click', (e) => {
+        e.stopPropagation();
+        handleUndoToastClick();
+    });
 
     // Start block confirmation modal buttons
     document.getElementById('cancel-start-confirm-btn')?.addEventListener('click', closeStartBlockConfirmModal);
@@ -1296,6 +1303,7 @@ function setupModalListeners() {
      * on desktop keeps its remove button).
      */
     const getEnforcedIOSSelectionFloor = () => {
+        if (!state.isIOS) return null;
         if (!state.editingBlocklistId) return null;
         // Allow mode is deliberately excluded — see
         // mergeIOSScreenTimeSelectionAdditive.
@@ -1797,6 +1805,21 @@ function setupModalListeners() {
             overrideDifficultyPayload.typeBeforeMax = state.lastOverrideTypeValueBeforeMaxDifficulty;
         }
 
+        // Save is the authoritative enforcement boundary. The picker and undo
+        // can leave a candidate that was valid while paused or between schedule
+        // segments; recompute friction now so a later resume/start cannot turn
+        // that stale candidate into a removal.
+        const iosScreenTimeSelectionForSave = resolveIOSScreenTimeSelectionForSave(
+            getBlocklistIOSScreenTimeSelection(existingBlocklistForSave),
+            modalIOSScreenTimeSelection,
+            {
+                mode,
+                editFrictionRequired: state.isIOS
+                    && !!state.editingBlocklistId
+                    && isBlocklistEditFrictionRequired(state.editingBlocklistId),
+            },
+        );
+
         // IMPORTANT: Create copies of the arrays, not references!
         const blocklist = {
             id: state.editingBlocklistId || generateId(),
@@ -1806,7 +1829,7 @@ function setupModalListeners() {
             emoji,
             websites: [...modalWebsites],
             apps: [...modalApps],
-            iosScreenTimeSelection: cloneIOSScreenTimeSelection(modalIOSScreenTimeSelection),
+            iosScreenTimeSelection: iosScreenTimeSelectionForSave,
             showItemDetails,
             alwaysShowInSchedule,
             overrideDifficulty: overrideDifficultyPayload,
@@ -3318,10 +3341,18 @@ export function applySettingsLanguage() {
     setText('schedule-confirm-override-header', tSettings('startScheduleHoldHeader'));
     setText('cancel-schedule-confirm-btn', tSettings('cancel'));
     setStartConfirmPrimaryLabel('proceed-schedule-confirm-btn', tSettings('startSchedule'));
-    setText('undo-toast-btn', tSettings('undo'));
-    const undoToastMsg = document.getElementById('undo-toast-message');
-    if (undoToastMsg && pendingDelete?.blocklist) {
-        undoToastMsg.textContent = tSettingsFmt('deleteUndoToastFmt', { name: pendingDelete.blocklist.name });
+    setText('undo-toast-btn-label', tSettings('undo'));
+    if (pendingDelete?.blocklist) {
+        setUndoToastMessage(
+            tSettings('deleteUndoToastPrefix'),
+            pendingDelete.blocklist.name,
+            tSettings('deleteUndoToastSuffix'),
+        );
+    } else if (pendingSegmentDelete) {
+        setUndoToastMessage(
+            tSettings('deleteSegmentUndoToastPrefix'),
+            tSettings('deleteSegmentUndoToastEmphasis'),
+        );
     }
     setText('override-all-title', tSettings('overrideAllTitle'));
     setText('override-all-warning-strong', tSettings('overrideAllWarningStrong'));

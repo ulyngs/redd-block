@@ -3321,7 +3321,7 @@ dependencies = [
 
 [[package]]
 name = "redd-block"
-version = "3.8.9"
+version = "3.8.10"
 dependencies = [
  "cocoa",
  "core-foundation",

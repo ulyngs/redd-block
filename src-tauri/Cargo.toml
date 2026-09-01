@@ -1,6 +1,6 @@
 [package]
 name = "redd-block"
-version = "3.8.9"
+version = "3.8.10"
 description = "Digital Habits: Blocker"
 authors = ["Centre for Digital Habits <team@digitalhabits.org>"]
 license = "CC-BY-NC-ND-3.0"

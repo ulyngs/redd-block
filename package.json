@@ -1,6 +1,6 @@
 {
   "name": "redd-block",
-  "version": "3.8.9",
+  "version": "3.8.10",
   "description": "Digital Habits: Blocker",
   "packageManager": "pnpm@11.13.1",
   "scripts": {

@@ -1,7 +1,7 @@
 {
   "$schema": "../node_modules/@tauri-apps/cli/config.schema.json",
   "productName": "Digital Habits Blocker Test",
-  "version": "3.8.9",
+  "version": "3.8.10",
   "identifier": "com.reddblock.systemtest",
   "build": {
     "frontendDist": "../dist",

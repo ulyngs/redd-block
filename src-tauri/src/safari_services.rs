@@ -17,10 +17,8 @@
 //!
 //! The dylib's load commands resolve `@rpath/libsafari_bridge.dylib`
 //! against rpaths added to the binary by `build.rs`. See that file
-//! for the rpath layout. On non-macOS targets this whole module is
-//! gated out so the rest of the crate still builds.
-
-#![cfg(target_os = "macos")]
+//! for the rpath layout. `lib.rs` gates this module with
+//! `#[cfg(target_os = "macos")]` so the rest of the crate still builds.
 
 use std::ffi::{c_char, CString};
 

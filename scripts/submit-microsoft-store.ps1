@@ -167,12 +167,30 @@ if (-not $env:RUNNER_TEMP) {
     $patchedJson = Join-Path ([System.IO.Path]::GetTempPath()) "store-submission-patched-$PID.json"
 }
 
+# The setup action installs the *latest* msstore CLI, so record which one ran —
+# upload failures here are usually the CLI, not us, and the version is the first
+# thing needed to tell those apart. Not captured into a variable: `2>&1` on a
+# native command wraps stderr in ErrorRecords, which throws under
+# $ErrorActionPreference = 'Stop', and this CLI logs to stderr freely.
+Write-Host 'msstore CLI version:' -ForegroundColor Cyan
+msstore --version
+
 # pathOrUrl must be the package file (.msix / .msixbundle / .msixupload).
 # -nc keeps the draft so we can strip superseded packages + stamp What's new
 # before committing. (msstore publish recreates the pending submission, so
 # metadata applied *before* upload would be discarded.)
+#
+# --uploadTimeout is passed explicitly on purpose. In CLI v0.4.0/v0.4.1 the
+# option's CustomParser only runs when the flag is present, so omitting it makes
+# System.CommandLine fall back to default(long) = 0. That zero reaches
+# AzureBlobManager and cancels the upload the instant it starts, failing with a
+# generic "Error while uploading the application package." regardless of package
+# size. https://github.com/microsoft/msstore-cli/issues/162
+# The fix is merged but unreleased (latest is v0.4.1, 2026-08-20); this line can
+# go once it ships. Note the flag does not exist in v0.3.9 or earlier, so if the
+# setup action is ever pinned back that far, this becomes an unknown-option error.
 Write-Host "Uploading $bundleOut to Store product $ProductId (no commit)…" -ForegroundColor Cyan
-msstore publish $bundleOut -id $ProductId -nc
+msstore publish $bundleOut -id $ProductId -nc --uploadTimeout 600
 Assert-CommandOk 'msstore publish -nc'
 
 $notesStamped = $false
